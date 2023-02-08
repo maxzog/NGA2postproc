@@ -1,8 +1,9 @@
 
 
 abstract type Particle{Float32<:Real} end
+abstract type grid{Float32<:Real} end
 
-struct grid
+struct dnsgrid<:grid{Float32}
     n :: Int64
     L :: Float32
     Δ :: Float32
@@ -12,7 +13,7 @@ struct grid
     P :: Array{Float32}
 end
 
-struct lesgrid
+struct lesgrid<:grid{Float32}
     n :: Int64
     L :: Float32
     Δ :: Float32
@@ -41,7 +42,7 @@ mutable struct part{Float32}<:Particle{Float32}
     fld :: Vector{Float32}
 end
 
-struct ou_part{Float32}<:Particle{Float32}
+mutable struct ou_part{Float32}<:Particle{Float32}
     id  :: Int64
     pos :: Vector{Float32}
     vel :: Vector{Float32}
@@ -58,12 +59,10 @@ function get_grid(dir::String, step::String, n::Int64, L::Float64)::grid
     """
     fnv = dir*"/velocity/velocity." * "0"^(6-length(step)) * step
     fnp = dir*"/pressure/pressure." * "0"^(6-length(step)) * step
-    fnν = dir*"/visc/visc." * "0"^(6-length(step)) * step
     U, V, W = read_vel(fnv, n)
     Δ = Float32(L/n)
     P = read_P(fnp, n)
-    ν = read_P(fnν, n)
-    return grid(n, Float32(L), Δ, U, V, W, P)
+    return dnsgrid(n, Float32(L), Δ, U, V, W, P)
 end
 
 function get_lesgrid(dir::String, step::Int64, n::Int64, L::Float64)::lesgrid
@@ -96,11 +95,10 @@ function get_grid(dir::String, step::Int64, n::Int64, L::Float64)::grid
     step = string(step)
     fnv = dir*"/velocity/velocity." * "0"^(6-length(step)) * step
     fnp = dir*"/pressure/pressure." * "0"^(6-length(step)) * step
-    fnν = dir*"/visc/visc." * "0"^(6-length(step)) * step
     U, V, W = read_vel(fnv, n)
     Δ = Float32(L/n)
     P = read_P(fnp, n)
-    return grid(n, Float32(L), Δ, U, V, W, P)
+    return dnsgrid(n, Float32(L), Δ, U, V, W, P)
 end
 
 function get_mon(dir::String)::mon
@@ -253,12 +251,13 @@ function man_split(fn::String)
     ls = readlines(io)
     ncols = lastindex(split(ls[1]))
     cols = Vector{String}(undef, ncols)
+    println(length(ls[2]))
     for i in 1:ncols
         if i == 1
             cols[i] = split(ls[1])[i]*" "*strip(ls[2][1:12])
         else
             j = 13 + (i-2)*14
-            cols[i] = strip((split(ls[1])[i]*" "*strip(ls[2][j:j+13])))
+            cols[i] = strip((split(ls[1])[i]*" "*ls[2][j:j+13]))
         end
     end
     return cols, ls
@@ -273,7 +272,11 @@ function read_mon_col(fn::String, col::String)::Vector{Float32}
     Reads NGA2 monitor files
     Outputs vector of [col name] vs. time
     """
-    cols, ls = man_split(fn)
+    # cols, ls = man_split(fn)
+    # println(cols)
+    io = open(fn, "r")
+    ls = readlines(io)
+    cols = strip.(split(ls[1]))
     ind = findall(el->el==col, cols)
     arr = zeros(lastindex(ls))
     for i in lastindex(ls):-1:1
@@ -281,11 +284,13 @@ function read_mon_col(fn::String, col::String)::Vector{Float32}
         if lastindex(vals) != lastindex(cols)
             return arr[lastindex(ls)-final_step(ls)+1:end]
         else
-            arr[i] = parse(Float32, vals[ind][1])
+            try
+                arr[i] = parse(Float32, vals[ind][1])
+            catch ArgumentError
+                return arr
+            end
         end
     end
     return arr[lastindex(ls)-final_step(ls):end]
  end
-
-
 
