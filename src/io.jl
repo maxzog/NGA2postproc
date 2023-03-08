@@ -40,6 +40,7 @@ mutable struct part{Float32}<:Particle{Float32}
     pos :: Vector{Float32}
     vel :: Vector{Float32}
     fld :: Vector{Float32}
+    uf  :: Vector{Float32}
 end
 
 mutable struct ou_part{Float32}<:Particle{Float32}
@@ -142,9 +143,10 @@ function get_parts(dir::String, step::Int64)
     U  = read_arr(dir*"fld"*suf, np)
     V  = read_arr(dir*"vel"*suf, np)
     ids= read_vec(dir*"id"*suf, np)
+    Uf = read_arr(dir*"uf"*suf, np)
     ps = Vector{part}(undef, np)
     for i in 1:np
-        ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i])
+        ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], Uf[:,i])
     end
     perm = sortperm([p.id for p in ps])
     return ps[perm]
@@ -155,7 +157,7 @@ function init_parts(n::Int64)::Vector{part}
     init particle vector for n particles
         pos, vel, fld all equal to zero
     """
-    ps = [part(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
+    ps = [part(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
     return ps
 end
 

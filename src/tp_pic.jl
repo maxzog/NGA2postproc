@@ -1,6 +1,6 @@
 
-function pic_rdf(psin::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
-    ps = re_id(psin)
+function pic_rdf(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
     Δ = field.L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps); N = np*(np-1)
@@ -41,11 +41,12 @@ function pic_rdf(psin::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
         den = 4/3*π*(rv[i+1]^3 - rv[i]^3)
         rdf[i] = bin/(den*ρ)
     end
-    return dr/2:dr:rmax-dr/2, rdf
+    # return dr/2:dr:rmax-dr/2, rdf
+    return dr, rdf
 end
 
 function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
-    ps = re_id(ps)
+    re_id!(psn)
     Δ = field.L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
@@ -86,11 +87,11 @@ function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=
     end
     c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
     uu = uu./(3*c); s = s/(3*sc)
-    return rv, uu, s
+    return dr, uu, s
 end
 
 function pic_vv(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
-    ps = re_id(ps)
+    re_id!(ps)
     Δ = field.L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
@@ -103,8 +104,8 @@ function pic_vv(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=
         rmax = (2*no+1)*norm([Δ, Δ, Δ])
     end
     dr = rmax/nb
-    vv = zeros(Float64, nb+1); rv = 0:dr:rmax
-    c  = zeros(Int, nb+1); sc = 0; s = 0.
+    vv = zeros(Float64, nb); rv = 0:dr:rmax
+    c  = zeros(Int, nb); sc = 0; s = 0.
 
     for p in ps
         ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
@@ -131,14 +132,122 @@ function pic_vv(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=
     end
     c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
     vv = vv./(3*c); s = s/(3*sc)
-    return rv, vv, s
+    return dr, vv, s
 end
 
-function re_id(ps::Vector{part})
+function pic_cov(psn::Vector{part}, psm::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(psn); re_id!(psm)
+    Δ = field.L / ncells
+    taui=1/0.28; dt=0.0428
+
+    # Particle-in-cell based on time n - not n-1! 
+    # Assumption that particles won't change their position significantly
+    npic, ipic = part_grid(psn, Δ, ncells)
+    np = lastindex(psn)
+    @assert sum(npic) == np
+    @assert np == lastindex(psm)
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    sig = zeros(Float64, nb); rv = 0:dr:rmax
+    c  = zeros(Int, nb); sc = 0; s = 0.
+
+    for ni in 1:np
+        pn = psn[ni]; pm = psm[ni]
+	@assert pn.id == pm.id
+        ip1, jp1, kp1 = get_ijk(pn, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for mi in ipic[:,ii,jj,kk]
+                        if mi != 0
+                            qn = psn[mi]; qm = psm[mi]
+			    @assert qn.id == qm.id
+                            r = get_minr(pn.pos, qn.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            sig[ir] += dot(pn.fld-pm.fld+pn.fld*taui*dt, qn.fld-qm.fld+qn.fld*taui*dt)
+                            c[ir]  += 1
+                        end
+                        if mi != 0 && psn[mi].id == pn.id
+                            s += dot(pn.fld-pm.fld+pn.fld*taui*dt, qn.fld-qm.fld+qn.fld*taui*dt)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    sig = sig./(3*c*dt); s = s/(3*sc*dt)
+    return dr, sig, s
+end
+
+function pic_wr(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    wr = zeros(Float64, (2, nb)); rv = 0:dr:rmax
+    cs  = zeros(Int, (2, nb)); sc = 0; s = 0.
+
+    for ni in 1:np
+        p = ps[ni]
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for mi in ipic[:,ii,jj,kk]
+                        if mi != 0
+                            q = ps[mi]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            r̂ = unit_r(p.pos, q.pos)
+                            w = dot(q.vel-p.vel, r̂ )
+                            ir = floor(Int, r/dr) + 1
+                            if w > 0.0
+                                wr[1,ir] += w
+                                cs[1,ir] += 1
+                            else
+                                wr[2,ir] += w
+                                cs[2,ir] += 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for i in 1:nb
+        if cs[1,i] != 0
+            wr[1,i] /= cs[1,i]
+        end
+        if cs[2,i] != 0
+            wr[2,i] /= cs[2,i]
+        end
+    end
+    return dr, wr
+end
+
+function re_id!(ps::Vector{part})
     for i in 1:lastindex(ps)
         ps[i].id = i
     end
-    return ps
 end
 
 function part_grid(ps::Vector{part}, Δ::Float32, ncells::Int64)::Tuple{Array{Int64}, Array{Int64}}

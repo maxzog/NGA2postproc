@@ -107,19 +107,68 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32, dim::Int64, nga::Bo
 end
 
 function uu_cond_r(psn::Vector{part}, nbins::Int64, subset::Tuple{Int64, Bool};
-    L = Float32(1.), Stk = Float32(1), nga = false)
+    L = Float32(6.2832), Stk = Float32(1), nga = true)
     npart = lastindex(psn)
     if subset[2] && subset[1] != npart
         psn = sample(psn, subset[1], replace = false, ordered = true)
     end
     npart = lastindex(psn)
-    usn = [p.fld for p in psn]
+    uu = zeros(nbins)
+    rmax = Float32(norm([L/2, L/2, L/2]))
+    dr = rmax / nbins
+    counts = zeros(nbins)
+    scounts = 0
+    muf = mean([p.fld for p in psn])
+    mus = mean([p.uf for p in psn])
+    println(muf)
+    println(mus)
+    self = 0.0
+    if nga
+        for i ∈ 1:npart, j ∈ i:npart
+            r = get_minr(psn[i].pos, psn[j].pos, L)
+            rind = floor(Int, r/dr) + 1
+            uu[rind] += dot(psn[i].fld+psn[i].uf-muf-mus, psn[j].fld+psn[j].uf-muf-mus)
+            counts[rind] += 1
+            if i == j
+                self += dot(psn[i].fld+psn[i].uf-muf-mus, psn[j].fld+psn[j].uf-muf-mus)
+                scounts += 1
+            end
+        end
+    # else
+    #     for i ∈ 1:1, j ∈ 1:npart
+    #         r = get_minr(psn[i].pos, psn[j].pos, L)
+    #         rind = floor(Int, r/dr) + 1
+    #         uu[1:3, 1:3, rind] += (usn[i] - mu) * (usn[j] - mu)'
+    #         counts[rind] += 1
+    #         if i == j
+    #             self += (usn[i] - mu) * (usn[j] - mu)'
+    #             scounts += 1
+    #         end
+    #     end
+    end
+    self /= scounts
+    for i in 1:lastindex(counts)
+        if counts[i] != 0
+            uu[i] = uu[i] / counts[i]
+        end
+    end
+    return uu, self
+end
+
+function vv_cond_r(psn::Vector{part}, nbins::Int64, subset::Tuple{Int64, Bool};
+    L = Float32(6.2832), Stk = Float32(1), nga = true)
+    npart = lastindex(psn)
+    if subset[2] && subset[1] != npart
+        psn = sample(psn, subset[1], replace = false, ordered = true)
+    end
+    npart = lastindex(psn)
+    usn = [p.vel for p in psn]
     uu = zeros(3,3,nbins)
     rmax = Float32(norm([L/2, L/2, L/2]))
     dr = rmax / nbins
     counts = zeros(nbins)
     scounts = 0
-    mu = mean([p.fld for p in psn])
+    mu = mean([p.vel for p in psn])
     self = zeros(3,3)
     if nga
         for i ∈ 1:npart, j ∈ i:npart
