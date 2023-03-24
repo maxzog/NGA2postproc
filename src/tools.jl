@@ -248,3 +248,91 @@ function fluid2part(X,xm,ym,zm,U,V,W)::Vector{Float32}
     wg= wwd[1,1,1]*W[i1,j1,k1]+wwd[2,1,1]*W[i2,j1,k1]+wwd[1,2,1]*W[i1,j2,k1]+wwd[2,2,1]*W[i2,j2,k1]+wwd[1,1,2]*W[i1,j1,k2]+wwd[2,1,2]*W[i2,j1,k2]+wwd[1,2,2]*W[i1,j2,k2]+ wwd[2,2,2]*W[i2,j2,k2]
     return Vector{Float32}([ug, vg, wg])
 end
+
+function scalar2part(X,xm,ym,zm,U)::Float32
+    """
+    Tri-linear velocity interpolation from Eulerian grid to Lagrangian particles
+    """
+    xp, yp, zp = X
+    # Get the grid index
+    dx = xm[2]-xm[1]
+    dy = ym[2]-ym[1]
+    dz = zm[2]-zm[1]
+    nx = length(xm)
+    ny = length(ym)
+    nz = length(zm)
+    ip=Int64(ceil(xp/dx))
+    jp=Int64(ceil(yp/dy))
+    kp=Int64(ceil(zp/dz))
+    
+    ip == 0 ? ip = 1 : nothing
+    jp == 0 ? jp = 1 : nothing
+    kp == 0 ? kp = 1 : nothing
+
+    ip > nx ? ip = nx : nothing
+    jp > ny ? jp = ny : nothing
+    kp > nz ? kp = nz : nothing
+
+    # Get interpolation cells w/r to centroids
+    sx = -1
+    sy = -1
+    sz = -1
+    if xp>=xm[ip]
+        sx = 0
+    end
+    if yp>=ym[jp]
+        sy = 0
+    end
+    if zp>=zm[kp]
+        sz = 0
+    end
+    
+    # Get the first interpolation point
+    i1=ip+sx; i2=i1+1
+    j1=jp+sy; j2=j1+1
+    k1=kp+sz; k2=k1+1
+    
+    # Correct for periodicity
+    if i1<1
+        i1=nx
+    end
+    if i2>nx
+        i2=1
+    end
+    if j1<1
+        j1=ny
+    end
+    if j2>ny
+        j2=1
+    end
+    if k1<1
+        k1=nz
+    end
+    if k2>nz
+        k2=1
+    end
+    
+    # Compute the linear interpolation coefficients
+    wx1 = (xm[i2]-xp )/(xm[i2]-xm[i1])
+    wx2 = (xp -xm[i1])/(xm[i2]-xm[i1])
+    wy1 = (ym[j2]-yp )/(ym[j2]-ym[j1])
+    wy2 = (yp -ym[j1])/(ym[j2]-ym[j1])
+    wz1 = (zm[k2]-zp )/(zm[k2]-zm[k1])
+    wz2 = (zp -zm[k1])/(zm[k2]-zm[k1])
+
+    wwd = zeros(2,2,2)
+    
+    # Combine the interpolation coefficients to form a tri-linear interpolation
+    wwd[1,1,1]=wx1*wy1*wz1
+    wwd[2,1,1]=wx2*wy1*wz1
+    wwd[1,2,1]=wx1*wy2*wz1
+    wwd[2,2,1]=wx2*wy2*wz1
+    wwd[1,1,2]=wx1*wy1*wz2
+    wwd[2,1,2]=wx2*wy1*wz2
+    wwd[1,2,2]=wx1*wy2*wz2
+    wwd[2,2,2]=wx2*wy2*wz2
+    
+    # Interpolate fluid velocity to particle location
+    ug= wwd[1,1,1]*U[i1,j1,k1]+wwd[2,1,1]*U[i2,j1,k1]+wwd[1,2,1]*U[i1,j2,k1]+wwd[2,2,1]*U[i2,j2,k1]+wwd[1,1,2]*U[i1,j1,k2]+wwd[2,1,2]*U[i2,j1,k2]+wwd[1,2,2]*U[i1,j2,k2]+ wwd[2,2,2]*U[i2,j2,k2]
+    return ug
+end

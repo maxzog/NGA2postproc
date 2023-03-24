@@ -244,6 +244,62 @@ function pic_wr(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=
     return dr, wr
 end
 
+function pic_BBt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    wr = zeros(Float64, (2, nb)); rv = 0:dr:rmax
+    cs  = zeros(Int, (2, nb)); sc = 0; s = 0.
+
+    for ni in 1:np
+        p = ps[ni]
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for mi in ipic[:,ii,jj,kk]
+                        if mi != 0
+                            q = ps[mi]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            r̂ = unit_r(p.pos, q.pos)
+                            w = dot(q.vel-p.vel, r̂ )
+                            ir = floor(Int, r/dr) + 1
+                            if w > 0.0
+                                wr[1,ir] += w
+                                cs[1,ir] += 1
+                            else
+                                wr[2,ir] += w
+                                cs[2,ir] += 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for i in 1:nb
+        if cs[1,i] != 0
+            wr[1,i] /= cs[1,i]
+        end
+        if cs[2,i] != 0
+            wr[2,i] /= cs[2,i]
+        end
+    end
+    return dr, wr
+end
+
 function re_id!(ps::Vector{part})
     for i in 1:lastindex(ps)
         ps[i].id = i

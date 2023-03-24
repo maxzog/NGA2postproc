@@ -15,7 +15,7 @@ function fld_autocorr(dir::String, mid::Int64)
             ac[i-mid+1] += dot(ps[j].fld+ps[j].uf-μs-μf, pso[j].fld+pso[j].uf-μs-μf)
         end
     end
-    return ac/npart/self
+    return ac/npart#/self
 end
 
 function us_autocorr(dir::String, mid::Int64)
@@ -51,7 +51,7 @@ function vel_autocorr(dir::String, mid::Int64)
             ac[i-mid+1] += dot(ps[j].vel-μ, pso[j].vel-μ)
         end
     end
-    return ac/npart/self
+    return ac/npart#/self
 end
 
 function uu_twotime()

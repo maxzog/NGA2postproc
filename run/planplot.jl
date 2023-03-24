@@ -1,19 +1,33 @@
 include("../src/build.jl")
 
+#using .Threads
+
 function main(ARGS::Vector{String})
     dir = ARGS[1]
-    ps  = get_parts(dir, 7);
-    println("Particle file opened successfully")
-    plane_plot(ps)
+    ps = get_parts(dir*"/particles/", 90)
+    plane_plot(ps, 90)
+ #   @threads for i in 1:305
+ #  	 ps  = get_parts(dir*"/particles/", i);
+ #  	 #hit = get_grid(dir, i, 256, 6.2832)
+ #  	 @printf("\nParticle file %i opened successfully", i)
+ #  	 plane_plot(ps, i)
+ #   end
 end
 
-function plane_plot(ps)
+function plane_plot(ps, i)
     # 2D slice
-    ids     = slice_lagrangian(ps, "z", Float32(3.14), w=Float32(.2))
+    ids     = slice_lagrangian(ps, "z", Float32(3.14), w=Float32(.1))
     x, y, z = getXs(ps[ids])
-    writedlm("./Xs/x", x)
-    writedlm("./Xs/y", y)
-    writedlm("./Xs/z", z)
+    #ωω = enstrophy(hit.U, hit.V, hit.W, hit.n, hit.n, hit.n, hit.L)
+    #xm = collect(hit.Δ/2:hit.Δ:hit.L-hit.Δ/2)
+    #ym = collect(hit.Δ/2:hit.Δ:hit.L-hit.Δ/2)
+    #zm = collect(hit.Δ/2:hit.Δ:hit.L-hit.Δ/2)
+    #println("Lastindex xm: ", lastindex(xm)) 
+    #v = [scalar2part(p.pos, xm, ym, zm, ωω) for p in ps[ids]]
+    writedlm("./Xs/x_"*string(i), x)
+    writedlm("./Xs/y_"*string(i), y)
+    writedlm("./Xs/z_"*string(i), z)
+    #writedlm("./Xs/v_"*string(i), v)
     # plt = scatter(
     #         x, y, 
     #         markersize=.9, markercolor="black", α=1, 
