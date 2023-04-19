@@ -46,7 +46,7 @@ function pic_rdf(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells
 end
 
 function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
-    re_id!(psn)
+    re_id!(ps)
     Δ = field.L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)

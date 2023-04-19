@@ -43,6 +43,13 @@ mutable struct part{Float32}<:Particle{Float32}
     uf  :: Vector{Float32}
 end
 
+mutable struct part_dns{Float32}<:Particle{Float32}
+    id  :: Int64
+    pos :: Vector{Float32}
+    vel :: Vector{Float32}
+    fld :: Vector{Float32}
+end
+
 mutable struct ou_part{Float32}<:Particle{Float32}
     id  :: Int64
     pos :: Vector{Float32}
@@ -147,6 +154,24 @@ function get_parts(dir::String, step::Int64)
     ps = Vector{part}(undef, np)
     for i in 1:np
         ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], Uf[:,i])
+    end
+    perm = sortperm([p.id for p in ps])
+    return ps[perm]
+end
+
+function get_parts_dns(dir::String, step::Int64)
+    """
+    Returns vector of particles with id, position, particle velocity, and fldvel seen
+    """
+    suf = "."*"0"^(6-length(string(step)))*string(step)
+    np = get_npart(dir*"particle"*suf)
+    X  = read_pos(dir*"particle"*suf, np)
+    U  = read_arr(dir*"fld"*suf, np)
+    V  = read_arr(dir*"vel"*suf, np)
+    ids= read_vec(dir*"id"*suf, np)
+    ps = Vector{part}(undef, np)
+    for i in 1:np
+        ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], Float32.([0., 0., 0.]))
     end
     perm = sortperm([p.id for p in ps])
     return ps[perm]

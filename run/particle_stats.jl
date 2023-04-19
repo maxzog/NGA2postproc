@@ -96,7 +96,7 @@ function pvv(case::String, edir::String, ti::Int64, tf::Int64, n::Int64)
     @threads for step in ti:tf
         ps = get_parts(edir*"/particles/", step)
         hit= get_grid(edir, step, n, 6.2832)
-        dr, vvt, st = pic_vv(sample(ps, 250_000, replace=false), hit, 0.5, 128; ncells=16)
+        dr, vvt, st = pic_vv(sample(ps, 15_000, replace=false), hit, 1.5, 128; ncells=16)
         vv[threadid(), :] += vvt
         s[threadid()] += st
         c[threadid()] += 1.
