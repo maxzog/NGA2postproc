@@ -1,9 +1,19 @@
 
 
 abstract type Particle{Float32<:Real} end
-abstract type grid{Float32<:Real} end
+abstract type grid end
 
-struct dnsgrid<:grid{Float32}
+struct dnsgrid64<:grid
+    n :: Int64
+    L :: Float64
+    Δ :: Float64
+    U :: Array{Float64}
+    V :: Array{Float64}
+    W :: Array{Float64}
+    P :: Array{Float64}
+end
+
+mutable struct dnsgrid<:grid
     n :: Int64
     L :: Float32
     Δ :: Float32
@@ -13,17 +23,34 @@ struct dnsgrid<:grid{Float32}
     P :: Array{Float32}
 end
 
-struct lesgrid<:grid{Float32}
-    n :: Int64
-    L :: Float32
-    Δ :: Float32
+"""
+Struct LES grid is meant for filtering of DNS data in post
+Stores unfilitered and filtered fields, filter type, filter width, and cutoff
+"""
+mutable struct lesgrid<:grid
+    ftype :: String
+    isFiltered :: Bool
+
+    n  :: Int64
+    L  :: Float32
+    Δ  :: Float32
+    Δf :: Float32
+    κc :: Float32
+
     U :: Array{Float32}
     V :: Array{Float32}
     W :: Array{Float32}
     P :: Array{Float32}
-    ν :: Array{Float32}
-    λ :: Array{Float32}
-    ϵ :: Array{Float32}
+
+    Uf :: Array{Float32}
+    Vf :: Array{Float32}
+    Wf :: Array{Float32}
+    Pf :: Array{Float32}
+
+    Uk :: Array{Complex{Float32}}
+    Vk :: Array{Complex{Float32}}
+    Wk :: Array{Complex{Float32}}
+    Pk :: Array{Complex{Float32}}
 end
 
 struct mon
@@ -57,6 +84,50 @@ mutable struct ou_part{Float32}<:Particle{Float32}
     fld :: Vector{Float32}
     a   :: Float32
     b   :: Float32
+end
+
+Base.copy(hit::dnsgrid) = dnsgrid(hit.n, hit.L, hit.Δ, hit.U, hit.V, hit.W, hit.P)
+
+function get_grid(fname::String, L::Float64)
+   """
+   Reads NGA2 binary data files and returns a grid type containing the stored data fields
+   """
+   io = open(fname)
+   arr = Vector{Int32}(undef, 5)  
+
+   # Read size of grid and number of vectors and scalars
+   read!(io, arr)
+   nx,ny,nz,nval,nvar=arr
+
+   # Read value header
+   arr = Vector{Char}(undef, nval*8)
+   for i in 1:(nval*8)
+       p = read(io, Char)
+       arr[i]=p
+   end
+   
+   # Read values
+   arr = Vector{Float64}(undef, nval)
+   read!(io, arr)
+   
+   # Read var header
+   var_names = Vector{Char}(undef, nvar*8)
+   for i in 1:(nvar*8)
+       p = read(io, Char)
+       var_names[i]=p
+   end
+   
+   field = Array{Float64}(undef, (nvar,nx,ny,nz))
+
+   # Read var 
+   for i in 1:nvar
+       arr = Array{Float64}(undef, (nx,ny,nz))
+       read!(io, arr)
+       field[i,:,:,:] = arr
+   end
+   
+   close(io)
+   return dnsgrid64(nx, L, L/nx, field[1,:,:,:], field[2,:,:,:], field[3,:,:,:], field[4,:,:,:])
 end
 
 function get_grid(dir::String, step::String, n::Int64, L::Float64)::grid

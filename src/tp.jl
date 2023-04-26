@@ -106,6 +106,44 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32, dim::Int64, nga::Bo
     return dr/2:dr:rmax-dr/2, rdf
 end
 
+function S_ff2(psn::Vector{part}, nbins::Int64, subset::Tuple{Int64, Bool};
+    L = Float32(6.2832), Stk = Float32(1), nga = true)
+    npart = lastindex(psn)
+    if subset[2] && subset[1] != npart
+        psn = sample(psn, subset[1], replace = false, ordered = true)
+    end
+    npart = lastindex(psn)
+    uu = zeros(nbins)
+    rmax = Float32(norm([L/2, L/2, L/2]))
+    dr = rmax / nbins
+    counts = zeros(nbins)
+    scounts = 0
+    muf = mean([p.fld for p in psn])
+    mus = mean([p.uf for p in psn])
+    println(muf)
+    println(mus)
+    self = 0.0
+    if nga
+        for i ∈ 1:npart, j ∈ i:npart
+            r = get_minr(psn[i].pos, psn[j].pos, L)
+            rind = floor(Int, r/dr) + 1
+            uu[rind] += dot(psn[i].fld+psn[i].uf-muf-mus-psn[j].fld+psn[j].uf-muf-mus, psn[i].fld+psn[i].uf-muf-mus-psn[j].fld+psn[j].uf-muf-mus)
+            counts[rind] += 3
+            if i == j
+                self += dot(psn[i].fld+psn[i].uf-muf-mus-psn[j].fld+psn[j].uf-muf-mus, psn[i].fld+psn[i].uf-muf-mus-psn[j].fld+psn[j].uf-muf-mus)
+                scounts += 3
+            end
+        end
+    end
+    self /= scounts
+    for i in 1:lastindex(counts)
+        if counts[i] != 0
+            uu[i] = uu[i] / counts[i]
+        end
+    end
+    return uu, self
+end
+
 function uu_cond_r(psn::Vector{part}, nbins::Int64, subset::Tuple{Int64, Bool};
     L = Float32(6.2832), Stk = Float32(1), nga = true)
     npart = lastindex(psn)

@@ -1,68 +1,157 @@
 
-function get_minr(X1::Vector{Float32}, X2::Vector{Float32}, perL::Float32; eps = 1e-10)::Float32
-    """
-    Minimum particle separation distance assuming cubic, periodic domain
-    """
-    r = zeros(length(X1))
-    for i ∈ 1:length(X1)
-        dx = X2[i] - X1[i]
-        abs(dx) > abs(dx - perL) ? dx -= perL : nothing
-        abs(dx) > abs(dx + perL) ? dx += perL : nothing
-        r[i] = dx
-    end
-    return norm(r)
-end
-
-function spectral(hit::grid)
+function spectral!(hit::lesgrid)
     p = plan_fft(hit.U)
-    Uk=p*hit.U; Vk=p*hit.V; Wk=p*hit.W
-    return Uk, Vk, Wk 
+    hit.Uk = p*hit.U; hit.Vk = p*hit.V; hit.Wk = p*hit.W; hit.Pk = p*hit.P
+    return 
 end
 
-function spectral(hit::lesgrid)
-    p = plan_fft(hit.Uf)
-    Uk=p*hit.Uf; Vk=p*hit.Vf; Wk=p*hit.Wf
-    return Uk, Vk, Wk 
+function ispectral!(hit::lesgrid)
+    ip = plan_ifft(hit.Uf)
+    hit.Uk=ip*hit.Uk; hit.Vk=ip*hit.Vk; hit.Wk=ip*hit.Wk; hit.Pk=ip*hit.Pk
+    return 
 end
 
-function ispectral(Uk::Array{Float32}, Vk::Array{Float32}, Wk::Array{Float32})
-    ip = plan_ifft(Uk)
-    U=ip*Uk; V=ip*Vk; W=ip*Wk
-    return U, V, W 
-end
-
-function get_spectrum(hit::grid)  
-    n = trunc(Int, hit.n/2)
-    kv = fftshift(-n:n-1)
-    dk = 2*π/hit.L
-    Uk, Vk, Wk = spectral(hit)
-    spec = zeros(Float32, ceil(Int64, norm([maximum(abs.(kv))+.5 for _ in 1:3])))
-    counts = zeros(Int64, length(spec))
+function sharpspec!(hit::lesgrid, kv::Vector{Int64})
     for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
-        kk = norm([kv[i], kv[j], kv[k]])
-        ik = floor(Int64, kk/dk+0.5)+1
-        if ik > 1e-6
-            spec[ik] += 0.5*(real(Uk[i,j,k]*conj(Uk[i,j,k])) + real(Vk[i,j,k]*conj(Vk[i,j,k])) + real(Wk[i,j,k]*conj(Wk[i,j,k])))
+        kk = norm([kv[i] kv[j] kv[k]])
+        heavy = hit.κc - kk
+        if heavy <= 0
+            hit.Uk[i,j,k] = 0.0
+            hit.Vk[i,j,k] = 0.0
+            hit.Wk[i,j,k] = 0.0
+            hit.Pk[i,j,k] = 0.0
         end
     end
-    return spec/hit.n^6
+    return 
 end
 
-function get_spectrum(hit::lesgrid)  
+function gaussian_spec!(hit::lesgrid, kv::Vector{Int64})
+    for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
+        kk = norm([kv[i] kv[j] kv[k]])
+        G  = exp(-kk^2*hit.Δf^2/24)
+        hit.Uk[i,j,k] *= G
+        hit.Vk[i,j,k] *= G
+        hit.Wk[i,j,k] *= G
+        hit.Pk[i,j,k] *= G
+    end
+    return 
+end
+
+function spectralfilter!(hit::lesgrid)
+    spectral!(hit)
     n = trunc(Int, hit.n/2)
     kv = fftshift(-n:n-1)
-    dk = 2*π/hit.L
-    Uk, Vk, Wk = spectral(hit)
-    spec = zeros(Float32, ceil(Int64, norm([maximum(abs.(kv))+.5 for _ in 1:3])))
-    counts = zeros(Int64, length(spec))
-    for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
-        kk = norm([kv[i], kv[j], kv[k]])
-        ik = floor(Int64, kk/dk+0.5)+1
-        if ik > 1e-6
-            spec[ik] += 0.5*(real(Uk[i,j,k]*conj(Uk[i,j,k])) + real(Vk[i,j,k]*conj(Vk[i,j,k])) + real(Wk[i,j,k]*conj(Wk[i,j,k])))
+    if hit.ftype == "sharpspec"
+       sharpspec!(hit, kv)
+    elseif hit.ftype == "gaussian"
+       gaussian_spec!(hit, kv) 
+    end
+    ispectral!(hit)
+    hit.isFiltered=true
+    return 
+end
+
+function coarsen(U::Array{Float32}, n::Int64)
+    @assert n%2 == 0
+    nc = trunc(Int, n/2)
+    Uc = Array{Float32}(undef, (nc, nc, nc))
+    for i in 1:nc
+        for j in 1:nc
+            for k in 1:nc
+                Uc[i,j,k] = mean(U[2*i-1:2*i,2*j-1:2*j,2*k-1:2*k])
+            end
         end
     end
-    return spec/hit.n^6
+    return Uc
+end
+
+function box_ind(i::Int64, Δ::Int64, n::Int64)#::Tuple{Int64, Int64}
+    is = floor(Int, i-Δ/2); ie = ceil(Int, i+Δ/2)
+    ir = collect(is+1:ie-1)
+    for j in 1:lastindex(ir)
+        ir[j]<1 ? ir[j]+=n : nothing
+        ir[j]>n ? ir[j]-=n : nothing
+    end
+    return ir
+end
+
+function box_filt(U::Array{Float32}, Δ::Int64, n::Int64)
+    Uf = zeros((n,n,n))
+    flen = 0
+    for i in 1:n
+        ir = box_ind(i,Δ,n)
+        for j in 1:n
+            jr = box_ind(j,Δ,n)
+            for k in 1:n
+                kr = box_ind(k,Δ,n)
+                cut = U[ir,jr,kr]; flen = cut()
+                Δic = 1/size(cut)[1]^3
+                @assert sum([Δic for _ in 1:lastindex(cut)]) ≈ 1
+                Uf[i,j,k] = Δic * sum(cut)
+            end
+        end
+    end
+    return Uf
+end
+
+function LES(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
+   Δf = δ * hit.L / hit.n
+   les = lesgrid(ftype, false, hit.n, hit.L, hit.Δ, Δf, π/Δf, hit.U, hit.V, hit.W, hit.P,
+                 zeros(Float32, hit.n, hit.n, hit.n),zeros(Float32, hit.n, hit.n, hit.n),
+                 zeros(Float32, hit.n, hit.n, hit.n),zeros(Float32, hit.n, hit.n, hit.n),
+                 zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n),
+                 zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n))
+   spectralfilter!(les)
+   # check imag(z) << 1
+   @assert maximum(imag(les.Uk)) < eps
+   @assert minimum(imag(les.Uk)) > -eps
+   @assert maximum(imag(les.Vk)) < eps
+   @assert minimum(imag(les.Vk)) > -eps
+   @assert maximum(imag(les.Wk)) < eps
+   @assert minimum(imag(les.Wk)) > -eps
+
+   les.Uf=real(les.Uk); les.Vf=real(les.Vk); les.Wf=real(les.Wk); les.Pf=real(les.Pk);
+   return les
+end
+
+function padvel(U::Array{Float32}, δ::Int64, n::Int64)
+    np = 2*δ+n
+    # Upad = Array{Float32}(undef, (2*δ+n, 2*δ+n, 2*δ+n))
+    Upad = 12345*ones((np,np,np))
+    for i in 1:np
+        im = ind(i,n,δ)
+        for j in 1:np
+            jm = ind(j,n,δ)
+            for k in 1:np
+                km = ind(k,n,δ)
+                Upad[i,j,k] = U[im,jm,km]
+            end
+        end
+    end
+    return Upad
+end
+
+function ind(i,n,δ)
+    if i <= δ
+        im = n - i
+    elseif i > n
+        im = i - n
+    else 
+        im = i
+    end
+    return im
+end 
+
+function totKE(U, V, W, n)::Float32
+    KE = 0.
+    for i in 1:n
+        for j in 1:n
+            for k in 1:n
+                KE += 0.5*(U[i,j,k]^2 + V[i,j,k]^2 + W[i,j,k]^2)
+            end
+        end
+    end
+    return KE/(n^3)
 end
 
 # THIS DOES NOT WORK
