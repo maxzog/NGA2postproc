@@ -17,6 +17,21 @@ function fftcorrgrid_twotime(U::Array{Float32}, Us::Array{Float32}, comp::Int64)
     return dropdims(u, dims = Tuple(sumd))[1:trunc(Int64, lastindex(u)/2)]
 end
 
+function R11sgs(hit::grid)
+    corr = (fftcorrgrid(hit.U-hit.Uf, 1) + fftcorrgrid(hit.V-hit.Vf, 2) + fftcorrgrid(hit.W-hit.Wf, 3))./3
+    return corr
+end
+
+function R11f(hit::grid)
+    corr = (fftcorrgrid(hit.Uf, 1) + fftcorrgrid(hit.Vf, 2) + fftcorrgrid(hit.Wf, 3))./3
+    return corr
+end
+
+function R22f(hit::grid)
+    corr = (fftcorrgrid(hit.Uf, 2) + fftcorrgrid(hit.Vf, 3) + fftcorrgrid(hit.Wf, 1))./3
+    return corr
+end
+
 function R11(hit::grid)
     corr = (fftcorrgrid(hit.U, 1) + fftcorrgrid(hit.V, 2) + fftcorrgrid(hit.W, 3))./3
     return corr

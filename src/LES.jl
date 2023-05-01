@@ -11,6 +11,20 @@ function ispectral!(hit::lesgrid)
     return 
 end
 
+function tophat_spec!(hit::lesgrid, kv::Vector{Int64})
+    for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
+        kk = norm([kv[i] kv[j] kv[k]])
+        if kk > 1e-6
+            G = sin(0.5*kk*hit.Δf)/(0.5*kk*hit.Δf)
+            hit.Uk[i,j,k] *= G 
+            hit.Vk[i,j,k] *= G 
+            hit.Wk[i,j,k] *= G 
+            hit.Pk[i,j,k] *= G
+        end
+    end
+    return 
+end
+
 function sharpspec!(hit::lesgrid, kv::Vector{Int64})
     for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
         kk = norm([kv[i] kv[j] kv[k]])
@@ -45,6 +59,8 @@ function spectralfilter!(hit::lesgrid)
        sharpspec!(hit, kv)
     elseif hit.ftype == "gaussian"
        gaussian_spec!(hit, kv) 
+    elseif hit.ftype == "tophat"
+       tophat_spec!(hit, kv) 
     end
     ispectral!(hit)
     hit.isFiltered=true
@@ -103,6 +119,7 @@ function LES(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
                  zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n))
    spectralfilter!(les)
    # check imag(z) << 1
+   println(maximum(imag(les.Uk)))
    @assert maximum(imag(les.Uk)) < eps
    @assert minimum(imag(les.Uk)) > -eps
    @assert maximum(imag(les.Vk)) < eps

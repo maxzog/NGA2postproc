@@ -5,6 +5,10 @@ function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
     @assert sum(npic) == np
+    println("Warning: Overwriting all p.uf to zero")
+    for p in ps
+        p.uf = Float32.([0., 0., 0.])
+    end
 
     no = floor(Int64, rmax/Δ)
     if no == 0
@@ -30,13 +34,13 @@ function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
                             ir = floor(Int, r/dr) + 1
                             if p.id != q.id
                                 rl, rt = par_perp_u(p, q)
-                                uul[ir] += dot(p.fld+p.uf,rl)*dot(q.fld+q.uf,rl) 
+                                uul[ir] += dot(p.fld+p.uf,rl)*dot(q.fld+q.uf,rl)
                                 uut[ir] += dot(p.fld+p.uf,rt)*dot(q.fld+q.uf,rt) 
                                 c[ir]  += 1
-                            else
-                                uul[ir] += dot(p.fld+p.uf,q.fld+q.uf)
-                                uut[ir] += dot(p.fld+p.uf,q.fld+q.uf)
-                                c[ir] += 1
+                            #else
+                            #    uul[ir] += dot(p.fld+p.uf,q.fld+q.uf)
+                            #    uut[ir] += dot(p.fld+p.uf,q.fld+q.uf)
+                            #    c[ir] += 1
                             end
                         end
                         if ni != 0 && ps[ni].id == p.id
@@ -56,8 +60,11 @@ end
 function par_perp_u(p::part, q::part)
     r = q.pos-p.pos
     rll = r/norm(r)
-    rt1 = cross(r,p.fld+p.uf) / norm(cross(r,p.fld+p.uf))
+    rt1 = cross(rll,p.fld+p.uf) / norm(cross(rll,p.fld+p.uf))
     rt2 = cross(rt1,rll) / norm(cross(rt1,rll))
+    @assert norm(rll)≈1.
+    @assert norm(rt1)≈1.
+    @assert norm(rt2)≈1.
     return rll, rt2
 end
 
