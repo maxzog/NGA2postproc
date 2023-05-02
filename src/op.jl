@@ -1,4 +1,20 @@
 
+function get_sig_X(dir::String, ti::Int64, tf::Int64)
+    Xt = zeros(Float32, tf-ti+1)
+    c  = zeros(Int32, tf-ti+1)
+    pso = get_parts_dns(dir, ti)
+    for t in ti:tf
+        ps = get_parts_dns(dir, ti)
+        for i in 1:lastindex(ps)
+            p = pso[i]; q = ps[i]
+            @assert p.id == q.id
+            Xt[t-ti+1] += mean([(q.pos[j]-p.pos[j])^2 for j in 1:3])
+            c[t-ti+1]  += 1
+        end
+    end
+    return Xt./c
+end
+
 function variance(arr::Vector{Vector{Float32}})::Float32
     μ = mean(arr)
     var = mean([dot(x-μ, x-μ)/3 for x in arr])
