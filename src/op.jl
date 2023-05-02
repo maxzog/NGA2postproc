@@ -4,7 +4,7 @@ function get_sig_X(dir::String, ti::Int64, tf::Int64)
     c  = zeros(Int32, tf-ti+1)
     pso = get_parts_dns(dir, ti)
     for t in ti:tf
-        ps = get_parts_dns(dir, ti)
+        ps = get_parts_dns(dir, t)
         for i in 1:lastindex(ps)
             p = pso[i]; q = ps[i]
             @assert p.id == q.id

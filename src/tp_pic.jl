@@ -111,11 +111,6 @@ function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; 
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
     @assert sum(npic) == np
-    println("Warning: Overwriting all p.uf to zero")
-
-    for p in ps
-        p.uf = Float32.([0., 0., 0.])
-    end
 
     no = floor(Int64, rmax/Δ)
     if no == 0
@@ -530,7 +525,13 @@ function pic_BBt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells
     return dr, wr
 end
 
-function re_id!(ps::Vector{Particle})
+function re_id!(ps::Vector{part_dns})
+    for i in 1:lastindex(ps)
+        ps[i].id = i
+    end
+end
+
+function re_id!(ps::Vector{part})
     for i in 1:lastindex(ps)
         ps[i].id = i
     end
