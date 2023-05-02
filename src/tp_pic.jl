@@ -53,6 +53,58 @@ function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
     return dr, uul, uut, s
 end
 
+function pic_struct_lt(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    uul = zeros(Float64, nb+1); rv = 0:dr:rmax
+    uut = zeros(Float64, nb+1); rv = 0:dr:rmax
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0 
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            if p.id != q.id
+                                rl, rt = par_perp_u(p, q)
+                                url = dot(q.fld,rl)-dot(p.fld,rl)
+                                urt = dot(q.fld,rt)-dot(p.fld,rt)
+                                uul[ir] += url*url
+                                uut[ir] += urt*urt
+                                c[ir]  += 1
+                            end
+                        end
+                        if ni != 0 && ps[ni].id == p.id
+                            s += dot(ps[ni].fld-p.fld,ps[ni].fld-p.fld)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    return dr, uul, uut, s
+end
+
 function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
     re_id!(ps)
     Δ = field.L / ncells
@@ -60,6 +112,7 @@ function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; 
     np = lastindex(ps)
     @assert sum(npic) == np
     println("Warning: Overwriting all p.uf to zero")
+
     for p in ps
         p.uf = Float32.([0., 0., 0.])
     end
@@ -113,6 +166,17 @@ function par_perp_u(p::part, q::part)
     r = q.pos-p.pos
     rll = r/norm(r)
     rt1 = cross(rll,p.fld+p.uf) / norm(cross(rll,p.fld+p.uf))
+    rt2 = cross(rt1,rll) / norm(cross(rt1,rll))
+    @assert norm(rll)≈1.
+    @assert norm(rt1)≈1.
+    @assert norm(rt2)≈1.
+    return rll, rt2
+end
+
+function par_perp_u(p::part_dns, q::part)
+    r = q.pos-p.pos
+    rll = r/norm(r)
+    rt1 = cross(rll,p.fld) / norm(cross(rll,p.fld))
     rt2 = cross(rt1,rll) / norm(cross(rt1,rll))
     @assert norm(rll)≈1.
     @assert norm(rt1)≈1.
@@ -466,7 +530,7 @@ function pic_BBt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells
     return dr, wr
 end
 
-function re_id!(ps::Vector{part})
+function re_id!(ps::Vector{Particle})
     for i in 1:lastindex(ps)
         ps[i].id = i
     end

@@ -240,9 +240,9 @@ function get_parts_dns(dir::String, step::Int64)
     U  = read_arr(dir*"fld"*suf, np)
     V  = read_arr(dir*"vel"*suf, np)
     ids= read_vec(dir*"id"*suf, np)
-    ps = Vector{part}(undef, np)
+    ps = Vector{part_dns}(undef, np)
     for i in 1:np
-        ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], Float32.([0., 0., 0.]))
+        ps[i] = part_dns(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i])
     end
     perm = sortperm([p.id for p in ps])
     return ps[perm]
