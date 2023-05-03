@@ -92,7 +92,7 @@ function pic_struct_lt_vel(ps::Vector{part_dns}, field::grid, rmax::Float64, nb:
                             end
                         end
                         if ni != 0 && ps[ni].id == p.id
-                            s += dot(ps[ni].vel-p.vel-,ps[ni].vel-p.vel)
+                            s += dot(ps[ni].vel-p.vel,ps[ni].vel-p.vel)
                             sc += 1
                         end
                     end
