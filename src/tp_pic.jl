@@ -92,7 +92,7 @@ function pic_struct_lt_vel(ps::Vector{part_dns}, field::grid, rmax::Float64, nb:
                             end
                         end
                         if ni != 0 && ps[ni].id == p.id
-                            s += dot(ps[ni].vel-p.vel-,ps[ni].vel-p.vel)
+                            s += dot(ps[ni].vel-p.vel,ps[ni].vel-p.vel)
                             sc += 1
                         end
                     end
@@ -280,6 +280,52 @@ function par_perp_u(p::part_dns, q::part)
     @assert norm(rt1)≈1.
     @assert norm(rt2)≈1.
     return rll, rt2
+end
+
+function pic_rdf(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps); N = np*(np-1)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    rdf = zeros(Float64, nb); rv = 0:dr:rmax
+
+    V = (field.L)^3
+    ρ = N / V
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0 && ps[ni].id != p.id
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            rdf[ir] += 1.
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # normalize
+    for (i, bin) in enumerate(rdf)
+        den = 4/3*π*(rv[i+1]^3 - rv[i]^3)
+        rdf[i] = bin/(den*ρ)
+    end
+    # return dr/2:dr:rmax-dr/2, rdf
+    return dr, rdf
 end
 
 function pic_rdf(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
@@ -638,6 +684,31 @@ function re_id!(ps::Vector{part})
     for i in 1:lastindex(ps)
         ps[i].id = i
     end
+end
+
+function part_grid(ps::Vector{part_dns}, Δ::Float32, ncells::Int64)::Tuple{Array{Int64}, Array{Int64}}
+    npic = zeros(Int64, (ncells, ncells, ncells))
+    for p in ps
+        i, j, k = get_ijk(p, ncells, Δ)
+        npic[i,j,k] += 1
+    end
+    maxnpic = maximum(Int64, npic)
+    ipic = zeros(Int64, (maxnpic, ncells, ncells, ncells))
+    npic .*= 0
+    for p in ps
+        i, j, k = get_ijk(p, ncells, Δ)
+        npic[i,j,k] += 1
+        ipic[npic[i,j,k], i, j ,k] = p.id
+    end
+    return npic, ipic
+end
+
+function get_ijk(p::part_dns, n::Int64, Δ::Float32)::Tuple{Int64, Int64, Int64}
+    i, j, k = trunc.(Int64, ceil.(p.pos ./ Δ))
+    @assert i <= n; @assert i>=1
+    @assert j <= n; @assert j>=1
+    @assert k <= n; @assert k>=1
+    return (i,j,k)
 end
 
 function part_grid(ps::Vector{part}, Δ::Float32, ncells::Int64)::Tuple{Array{Int64}, Array{Int64}}
