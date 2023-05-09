@@ -40,3 +40,46 @@ function enstrophy(U::Array{Float32, 3}, V::Array{Float32, 3}, W::Array{Float32,
     end
     return ωω
 end
+
+function dissipation(field::grid, nu::Float64, veltype::String)
+    """
+    Returns psuedo-dissipation rate
+    """
+    if veltype == "SGS"
+        Usgs = field.U - field.Uf
+        Vsgs = field.V - field.Vf
+        Wsgs = field.W - field.Wf
+    end
+    eps_p = 0
+    dxi = 1/field.Δ; dyi = 1/field.Δ; dzi = 1/field.Δ;
+    for i ∈ 1:field.n, j ∈ 1:field.n, k ∈ 1:field.n
+        ip1 = i + 1; im1 = i - 1
+        jp1 = j + 1; jm1 = j - 1
+        kp1 = k + 1; km1 = k - 1
+        i == field.n ? ip1 = 1 : nothing
+        j == field.n ? jp1 = 1 : nothing
+        k == field.n ? kp1 = 1 : nothing
+        i == 1 ? im1 = field.n : nothing
+        j == 1 ? jm1 = field.n : nothing
+        k == 1 ? km1 = field.n : nothing
+
+        inds = [(i,j,k), (ip1,jp1,kp1), (im1,jm1,km1)]
+        if veltype == "DNS"
+            dudx, dudy, dudz = ∇(field.U, field.n, dxi, dyi, dzi, inds)
+            dvdx, dvdy, dvdz = ∇(field.V, field.n, dxi, dyi, dzi, inds)
+            dwdx, dwdy, dwdz = ∇(field.W, field.n, dxi, dyi, dzi, inds)
+        elseif veltype == "SGS"
+            dudx, dudy, dudz = ∇(Usgs, field.n, dxi, dyi, dzi, inds)
+            dvdx, dvdy, dvdz = ∇(Vsgs, field.n, dxi, dyi, dzi, inds)
+            dwdx, dwdy, dwdz = ∇(Wsgs, field.n, dxi, dyi, dzi, inds)
+        elseif veltype == "LES"
+            dudx, dudy, dudz = ∇(field.Uf, field.n, dxi, dyi, dzi, inds)
+            dvdx, dvdy, dvdz = ∇(field.Vf, field.n, dxi, dyi, dzi, inds)
+            dwdx, dwdy, dwdz = ∇(field.Wf, field.n, dxi, dyi, dzi, inds)
+        end
+        eps_p += dudx^2 + dudy^2 + dudz^2 + 
+                 dvdx^2 + dvdy^2 + dvdz^2 + 
+                 dwdz^2 + dwdy^2 + dwdz^2
+    end
+    return nu*eps_p/field.n^3
+end

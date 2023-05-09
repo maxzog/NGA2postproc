@@ -271,7 +271,7 @@ function par_perp_u(p::part, q::part)
     return rll, rt2
 end
 
-function par_perp_u(p::part_dns, q::part)
+function par_perp_u(p::part_dns, q::part_dns)
     r = q.pos-p.pos
     rll = r/norm(r)
     rt1 = cross(rll,p.fld) / norm(cross(rll,p.fld))

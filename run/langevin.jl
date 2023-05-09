@@ -15,10 +15,10 @@ mutable struct simulation
 end
 
 function main()
-    dt=1e-3; tf=0.5; func="Hello"; 
-    np=500; L=6.2832; 
+    dt=1e-3; tf=2.0; func="Hello"; 
+    np=5_000; L=6.2832; 
     eps=27.0; tke=15.0; nu=8e-3; 
-    St=1.0
+    St=1
     sim, hit, ps = init_sim(dt, tf, func, np, L, eps, tke, nu, St)
     step = 0
 
@@ -26,7 +26,8 @@ function main()
 
     @printf("\nStarting simulation ...")
     while sim.t < sim.tf
-        sim_step!(sim, ps, hit)
+        # sim_step_scrw!(sim, ps, hit)
+        sim_step_rel!(sim, ps, hit)
         sim.t += sim.Δt
         @printf("\nTime = %.3f", sim.t)
         if step%5==0
@@ -57,7 +58,35 @@ function save_parts(sim::simulation, ps::Vector{part})
     writedlm("./outs/langevin/pos_"*string(round(sim.t, digits=3)), [p.pos for p in ps])
 end
 
-function sim_step!(sim::simulation, ps::Vector{part}, field::grid)
+function sim_step_rel!(sim::simulation, ps::Vector{part}, field::grid)
+    p = ps[1]
+    p.pos = Float32.([field.L/2, field.L/2, field.L/2])
+    p.vel = Float32.([0., 0., 0.])
+    p.fld = Float32.([0., 0., 0.])
+    p.uf  = Float32.([0., 0., 0.])
+    ps[1] = p
+    for i in 2:lastindex(ps)
+        q = ps[i] 
+        dW = randn(Float32, 6)
+       
+        rm  = get_minr(p.pos,ps[i].pos,field.L)
+        rho = corr(p, ps[i], sim, field)
+        
+        B   = [1-rho 0 0 rho-1 0 0 ;
+               0 1-rho 0 0 rho-1 0 ;
+               0 0 1-rho 0 0 rho-1]
+        
+        q.fld = q.fld - q.fld*sim.τLi*sim.Δt + sqrt(1.5*sim.eps)*B*dW*sqrt(sim.Δt)/sqrt(1+rho^2)
+        q.vel = q.vel + (q.fld - q.vel)*sim.τpi*sim.Δt
+        q.pos = q.pos + q.vel*sim.Δt
+
+        periodic!(q, field)
+
+        ps[i] = q
+    end
+end
+
+function sim_step_scrw!(sim::simulation, ps::Vector{part}, field::grid)
     for i in 1:lastindex(ps)
         # Spatial correlation part - particle-in-cell?
         # Could just sum over all particles
@@ -90,7 +119,7 @@ end
 
 function corr(p::part, q::part, sim::simulation, field::grid)
     r = get_minr(p.pos, q.pos, field.L)
-    r_c = 0.17; sig = 2*.07^2
+    r_c = 0.17; sig = 2*.1^2
     rhoij = (exp(-r^2/sig) - exp(-r_c^2/sig)) / (1-exp(r_c^2/sig))
     return rhoij
 end
