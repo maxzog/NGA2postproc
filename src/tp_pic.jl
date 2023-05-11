@@ -153,7 +153,7 @@ function pic_struct_lt_vel(ps::Vector{part}, field::grid, rmax::Float64, nb::Int
         end
     end
     c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
-    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    uul = uul./c; uut = uut./c; s = s/(3*sc)
     return dr, uul, uut, s
 end
 function pic_struct_lt(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
@@ -204,7 +204,7 @@ function pic_struct_lt(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int
         end
     end
     c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
-    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    uul = uul./c; uut = uut./c; s = s/(3*sc)
     return dr, uul, uut, s
 end
 
@@ -256,7 +256,7 @@ function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; 
         end
     end
     c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
-    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    uul = uul./c; uut = uut./c; s = s/(3*sc)
     return dr, uul, uut, s
 end
 
