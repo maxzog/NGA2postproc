@@ -15,7 +15,7 @@ mutable struct simulation
 end
 
 function main()
-    dt=1e-3; tf=2.0; func="Hello"; 
+    dt=1e-3; tf=1.0; func="Hello"; 
     np=100_000; L=6.2832; 
     eps=27.0; tke=15.0; nu=8e-3; 
     St=1.0
@@ -26,26 +26,27 @@ function main()
 
     @printf("\nStarting simulation ...")
     while sim.t < sim.tf
-        sim_step_crw!(sim, ps, hit)
+        # sim_step_crw!(sim, ps, hit)
         # sim_step_scrw!(sim, ps, hit)
-        # sim_step_rel!(sim, ps, hit)
+        sim_step_rel!(sim, ps, hit)
         sim.t += sim.Δt
         @printf("\nTime = %.3f", sim.t)
         if step%5==0
-            save_parts(sim, ps)
+            tstr = string(round(sim.t, digits=3))
+            write_ps(ps, "./outs/langevin/ps_"*tstr*".dat")
         end
         step += 1
     end
     @printf("\nSimulation finished")
-    if make_gif
-        a  = Animation()
-        fs = glob("./outs/langevin/*")
-        for i in 1:lastindex(fs)
-            X = readdlm(fs[i])
-            frame(a, part_scatter(X, sim, hit))
-        end
-        gif(a, "./img/animation.gif")
-    end
+    # if make_gif
+    #     a  = Animation()
+    #     fs = glob("./outs/langevin/*")
+    #     for i in 1:lastindex(fs)
+    #         X = readdlm(fs[i])
+    #         frame(a, part_scatter(X, sim, hit))
+    #     end
+    #     gif(a, "./img/animation.gif")
+    # end
 end
 
 function part_scatter(X, sim::simulation, hit::grid)
@@ -61,7 +62,7 @@ end
 
 function sim_step_rel!(sim::simulation, ps::Vector{part}, field::grid)
     p = ps[1]
-    p.pos = Float32.([field.l/2, field.l/2, field.l/2])
+    p.pos = Float32.([field.L/2, field.L/2, field.L/2])
     p.vel = Float32.([0., 0., 0.])
     p.fld = Float32.([0., 0., 0.])
     p.uf  = Float32.([0., 0., 0.])
@@ -70,7 +71,7 @@ function sim_step_rel!(sim::simulation, ps::Vector{part}, field::grid)
         q = ps[i] 
         dw = randn(Float32, 6)
        
-        rm  = get_minr(p.pos,ps[i].pos,field.l)
+        rm  = get_minr(p.pos,ps[i].pos,field.L)
         rho = corr(p, ps[i], sim, field)
         
         b   = [1-rho 0 0 rho-1 0 0 ;
@@ -142,10 +143,12 @@ end
 
 function periodic!(p::part, field::grid)
     for i in 1:3
-        if p.pos[i] > field.L
-            p.pos[i] = p.pos[i] - field.L
-        elseif p.pos[i] > field.L
-            p.pos[i] = p.pos[i] + field.L
+        while p.pos[i] > field.L || p.pos[i] < 0.0
+          if p.pos[i] > field.L
+              p.pos[i] = p.pos[i] - field.L
+          elseif p.pos[i] < 0.0
+              p.pos[i] = p.pos[i] + field.L
+          end
         end
     end
     return p

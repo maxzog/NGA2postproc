@@ -390,5 +390,70 @@ function read_mon_col(fn::String, col::String)::Vector{Float32}
         end
     end
     return arr[lastindex(ls)-final_step(ls):end]
- end
+end
 
+function write_ps(ps::Vector{part}, fn::String)
+    io = open(fn, "w")
+    write(io, Int32(lastindex(ps))) # write number of particles
+    for p in ps
+        write(io, p.id)
+        write(io, p.uf)
+        write(io, p.fld)
+        write(io, p.vel)
+        write(io, p.pos)
+    end
+    close(io)
+    return
+end
+
+function write_ps(ps::Vector{part_dns}, fn::String)
+    io = open(fn, "w")
+    write(io, Int32(lastindex(ps))) # write number of particles
+    for p in ps
+        write(io, p.id)
+        write(io, p.fld)
+        write(io, p.vel)
+        write(io, p.pos)
+    end
+    close(io)
+    return
+end
+
+function read_ps_dns(fn::String)::Vector{part_dns}
+    io = open(fn, "r")
+    np = Vector{Int32}(undef, 1)
+    read!(io, np)
+    ps = Vector{part_dns}(undef, np[1])
+    for i in 1:np[1]
+        p = part_dns(0, zeros(Float32, 3), zeros(Float32, 3), zeros(Float32, 3))
+        id = Vector{Int64}(undef, 1)
+        read!(io, id)
+        p.id = id[1]
+        read!(io, p.fld)
+        read!(io, p.vel)
+        read!(io, p.pos)
+        ps[i] = p
+    end
+    close(io)
+    return ps
+end
+
+function read_ps(fn::String)::Vector{part}
+    io = open(fn, "r")
+    np = Vector{Int32}(undef, 1)
+    read!(io, np)
+    ps = Vector{part}(undef, np[1])
+    for i in 1:np[1]
+        p = part(0, zeros(Float32, 3), zeros(Float32, 3), zeros(Float32, 3), zeros(Float32, 3))
+        id = Vector{Int64}(undef, 1)
+        read!(io, id)
+        p.id = id[1]
+        read!(io, p.uf)
+        read!(io, p.fld)
+        read!(io, p.vel)
+        read!(io, p.pos)
+        ps[i] = p
+    end
+    close(io)
+    return ps
+end
