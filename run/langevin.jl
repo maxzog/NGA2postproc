@@ -16,9 +16,9 @@ end
 
 function main()
     dt=1e-3; tf=2.0; func="Hello"; 
-    np=5_000; L=6.2832; 
+    np=100_000; L=6.2832; 
     eps=27.0; tke=15.0; nu=8e-3; 
-    St=1
+    St=1.0
     sim, hit, ps = init_sim(dt, tf, func, np, L, eps, tke, nu, St)
     step = 0
 
@@ -26,8 +26,9 @@ function main()
 
     @printf("\nStarting simulation ...")
     while sim.t < sim.tf
+        sim_step_crw!(sim, ps, hit)
         # sim_step_scrw!(sim, ps, hit)
-        sim_step_rel!(sim, ps, hit)
+        # sim_step_rel!(sim, ps, hit)
         sim.t += sim.Δt
         @printf("\nTime = %.3f", sim.t)
         if step%5==0
@@ -60,23 +61,38 @@ end
 
 function sim_step_rel!(sim::simulation, ps::Vector{part}, field::grid)
     p = ps[1]
-    p.pos = Float32.([field.L/2, field.L/2, field.L/2])
+    p.pos = Float32.([field.l/2, field.l/2, field.l/2])
     p.vel = Float32.([0., 0., 0.])
     p.fld = Float32.([0., 0., 0.])
     p.uf  = Float32.([0., 0., 0.])
     ps[1] = p
     for i in 2:lastindex(ps)
         q = ps[i] 
-        dW = randn(Float32, 6)
+        dw = randn(Float32, 6)
        
-        rm  = get_minr(p.pos,ps[i].pos,field.L)
+        rm  = get_minr(p.pos,ps[i].pos,field.l)
         rho = corr(p, ps[i], sim, field)
         
-        B   = [1-rho 0 0 rho-1 0 0 ;
+        b   = [1-rho 0 0 rho-1 0 0 ;
                0 1-rho 0 0 rho-1 0 ;
                0 0 1-rho 0 0 rho-1]
         
-        q.fld = q.fld - q.fld*sim.τLi*sim.Δt + sqrt(1.5*sim.eps)*B*dW*sqrt(sim.Δt)/sqrt(1+rho^2)
+        q.fld = q.fld - q.fld*sim.τLi*sim.Δt + sqrt(1.5*sim.eps)*b*dw*sqrt(sim.Δt)/sqrt(1+rho^2)
+        q.vel = q.vel + (q.fld - q.vel)*sim.τpi*sim.Δt
+        q.pos = q.pos + q.vel*sim.Δt
+
+        periodic!(q, field)
+
+        ps[i] = q
+    end
+end
+
+function sim_step_crw!(sim::simulation, ps::Vector{part}, field::grid)
+    for i in 1:lastindex(ps)
+        q = ps[i] 
+        dw = randn(Float32, 3)
+        
+        q.fld = q.fld - q.fld*sim.τLi*sim.Δt + sqrt(1.5*sim.eps)*dw*sqrt(sim.Δt)
         q.vel = q.vel + (q.fld - q.vel)*sim.τpi*sim.Δt
         q.pos = q.pos + q.vel*sim.Δt
 
