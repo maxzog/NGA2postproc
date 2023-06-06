@@ -2,7 +2,7 @@
 
 include("../src/build.jl")
 
-using Plots
+# using Plots
 
 mutable struct simulation
     Δt        :: Float32
@@ -16,7 +16,7 @@ end
 
 function main()
     dt=1e-3; tf=1.0; func="Hello"; 
-    np=100_000; L=6.2832; 
+    np=150_000; L=6.2832; 
     eps=27.0; tke=15.0; nu=8e-3; 
     St=1.0
     sim, hit, ps = init_sim(dt, tf, func, np, L, eps, tke, nu, St)

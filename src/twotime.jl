@@ -18,6 +18,24 @@ function fld_autocorr(dir::String, mid::Int64)
     return ac/npart#/self
 end
 
+function fldr_autocorr(dir::String, mid::Int64)
+    nsteps = [parse(Int, split(f, '.')[end]) for f in glob("id*", dir)]
+    nsteps = lastindex(unique(nsteps))
+    @assert mid < nsteps
+    ac = zeros(Float64, nsteps-mid+1)
+    pso = get_parts(dir, nsteps)
+    npart = lastindex(pso)
+    μf = mean([p.fld for p in pso])
+    self = mean([dot(p.fld-μf, p.fld-μf) for p in pso])
+    for i in mid:nsteps
+        ps = get_parts(dir, i)
+        for j in 1:lastindex(ps)
+            ac[i-mid+1] += dot(ps[j].fld-μf, pso[j].fld-μf)
+        end
+    end
+    return ac/npart#/self
+end
+
 function us_autocorr(dir::String, mid::Int64)
     nsteps = [parse(Int, split(f, '.')[end]) for f in glob("id*", dir)]
     nsteps = lastindex(unique(nsteps))

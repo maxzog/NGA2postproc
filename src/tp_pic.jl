@@ -5,10 +5,10 @@ function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
     @assert sum(npic) == np
-    println("Warning: Overwriting all p.uf to zero")
-    for p in ps
-        p.uf = Float32.([0., 0., 0.])
-    end
+    #println("Warning: Overwriting all p.uf to zero")
+    #for p in ps
+    #    p.uf = Float32.([0., 0., 0.])
+    #end
 
     no = floor(Int64, rmax/Δ)
     if no == 0
@@ -41,6 +41,60 @@ function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncel
                         end
                         if ni != 0 && ps[ni].id == p.id
                             s += dot(p.fld+p.uf, ps[ni].fld + ps[ni].uf)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    return dr, uul, uut, s
+end
+
+function pic_uu_lt(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+    #println("Warning: Overwriting all p.uf to zero")
+    #for p in ps
+    #    p.uf = Float32.([0., 0., 0.])
+    #end
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    uul = zeros(Float64, nb+1); rv = 0:dr:rmax
+    uut = zeros(Float64, nb+1); rv = 0:dr:rmax
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0 
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            if p.id != q.id
+                                rl, rt = par_perp_u(p, q)
+                                uul[ir] += dot(p.fld,rl)*dot(q.fld,rl)
+                                uut[ir] += dot(p.fld,rt)*dot(q.fld,rt) 
+                                c[ir]  += 1
+                            end
+                        end
+                        if ni != 0 && ps[ni].id == p.id
+                            s += dot(p.fld, ps[ni].fld)
                             sc += 1
                         end
                     end
@@ -260,6 +314,58 @@ function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; 
     return dr, uul, uut, s
 end
 
+function pic_struct_lt_inst(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    uul = zeros(Float64, nb+1); rv = 0:dr:rmax
+    uut = zeros(Float64, nb+1); rv = 0:dr:rmax
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0 
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            if p.id != q.id
+                                rl, rt = par_perp_u(p, q)
+                                url = dot(q.uf,rl)-dot(p.uf,rl)
+                                urt = dot(q.uf,rt)-dot(p.uf,rt)
+                                uul[ir] += url*url
+                                uut[ir] += urt*urt
+                                c[ir]  += 1
+                            end
+                        end
+                        if ni != 0 && ps[ni].id == p.id
+                            s += dot(ps[ni].uf-p.uf,ps[ni].uf-p.uf)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uul = uul./c; uut = uut./c; s = s/(3*sc)
+    return dr, uul, uut, s
+end
+
 function par_perp_u(p::part, q::part)
     r = q.pos-p.pos
     rll = r/norm(r)
@@ -419,7 +525,52 @@ function pic_sff(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells
     return dr, uu, s
 end
 
-function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+function pic_uu_inst(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    uu = zeros(Float64, nb+1); rv = 0:dr:rmax
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            uu[ir] += dot(p.uf, q.uf)
+                            c[ir]  += 1
+                        end
+                        if ni != 0 && ps[ni].id == p.id
+                            s += dot(p.uf, ps[ni].uf)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uu = uu./(3*c); s = s/(3*sc)
+    return dr, uu, s
+end
+
+function pic_uu(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
     re_id!(ps)
     Δ = field.L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
@@ -452,6 +603,51 @@ function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=
                         end
                         if ni != 0 && ps[ni].id == p.id
                             s += dot(p.fld, ps[ni].fld)
+                            sc += 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uu = uu./(3*c); s = s/(3*sc)
+    return dr, uu, s
+end
+
+function pic_uu(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+    re_id!(ps)
+    Δ = field.L / ncells
+    npic, ipic = part_grid(ps, Δ, ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+
+    no = floor(Int64, rmax/Δ)
+    if no == 0
+        rmax = norm([Δ, Δ, Δ])
+    else
+        rmax = (2*no+1)*norm([Δ, Δ, Δ])
+    end
+    dr = rmax/nb
+    uu = zeros(Float64, nb+1); rv = 0:dr:rmax
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+
+    for p in ps
+        ip1, jp1, kp1 = get_ijk(p, ncells, Δ)
+        for i in ip1-no:ip1+no
+            for j in jp1-no:jp1+no
+                for k in kp1-no:kp1+no
+                    ii, jj, kk = periodic_inds([i,j,k], ncells)
+                    for ni in ipic[:,ii,jj,kk]
+                        if ni != 0
+                            q = ps[ni]
+                            r = get_minr(p.pos, q.pos, field.L)
+                            ir = floor(Int, r/dr) + 1
+                            uu[ir] += dot(p.fld+p.uf, q.fld+q.uf)
+                            c[ir]  += 1
+                        end
+                        if ni != 0 && ps[ni].id == p.id
+                            s += dot(p.fld+p.uf, ps[ni].fld+ps[ni].uf)
                             sc += 1
                         end
                     end
