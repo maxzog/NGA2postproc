@@ -1,3 +1,12 @@
+function D(ps::Vector{part}, L::Float32, ncells::Int64)
+    npic, ipic = part_grid(ps, Float32(L/ncells), ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+    λ = np/ncells^3
+    s = std(npic)
+    sp = sqrt(λ) 
+    return (s-sp)/λ
+end
 
 function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
     re_id!(ps)
