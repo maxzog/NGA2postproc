@@ -6,6 +6,7 @@ const UMC = ["#00274c", "#4a5773", "#878c9c", "#c6c6c6", "#e0c795", "#f2c961", "
 include("io.jl")
 include("tools.jl")
 include("tp.jl")
+include("tp_jh.jl")
 include("tp_pic.jl")
 include("op.jl")
 include("twotime.jl")

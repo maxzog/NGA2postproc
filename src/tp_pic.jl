@@ -8,6 +8,15 @@ function D(ps::Vector{part}, L::Float32, ncells::Int64)
     return (s-sp)/λ
 end
 
+function Dnaive(ps::Vector{part}, L::Float32, ncells::Int64)
+    npic, ipic = part_grid(ps, Float32(L/ncells), ncells)
+    np = lastindex(ps)
+    @assert sum(npic) == np
+    lambda = np/ncells^3
+    # return reshape(npic, length(npic), 1)/lambda
+    return npic./lambda
+end
+
 function pic_uu_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; ncells=16)
     re_id!(ps)
     Δ = field.L / ncells

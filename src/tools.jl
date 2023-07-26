@@ -6,9 +6,10 @@ function get_minr(X1::Vector{Float32}, X2::Vector{Float32}, perL::Float32; eps =
     r = zeros(length(X1))
     for i ∈ 1:length(X1)
         dx = X2[i] - X1[i]
-        abs(dx) > abs(dx - perL) ? dx -= perL : nothing
-        abs(dx) > abs(dx + perL) ? dx += perL : nothing
-        r[i] = dx
+        
+        # abs(dx) > abs(dx - perL) ? dx -= perL : nothing
+        # abs(dx) > abs(dx + perL) ? dx += perL : nothing
+        r[i] = dx - perL*round(Int, dx/perL)
     end
     return norm(r)
 end
@@ -63,6 +64,36 @@ function get_spectrum(hit::lesgrid)
         end
     end
     return spec/hit.n^6
+end
+
+function get_tauEM(hitn::grid, hitm::grid, dt::Float32)::Float32
+   num = mean(hitn.U .* hitn.U + 
+              hitn.V .* hitn.V + 
+              hitn.W .* hitn.W)
+   
+   Ax = (hitn.U - hitm.U) ./ dt
+   Ay = (hitn.V - hitm.V) ./ dt
+   Az = (hitn.W - hitm.W) ./ dt
+   
+   den = mean(Ax .* Ax + 
+              Ay .* Ay +
+              Az .* Az)
+   return sqrt(num/den)
+end
+
+function get_tauEM(hitnp1::grid, hitn::grid, hitnm1::grid, dt::Float32)::Float32
+   num = mean(hitn.U .* hitn.U + 
+              hitn.V .* hitn.V + 
+              hitn.W .* hitn.W)
+   
+   Ax = (hitnp1.U - hitnm1.U) ./ (2 * dt)
+   Ay = (hitnp1.V - hitnm1.V) ./ (2 * dt)
+   Az = (hitnp1.W - hitnm1.W) ./ (2 * dt)
+   
+   den = mean(Ax .* Ax + 
+              Ay .* Ay +
+              Az .* Az)
+   return sqrt(num/den)
 end
 
 # THIS DOES NOT WORK

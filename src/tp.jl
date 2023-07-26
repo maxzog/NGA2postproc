@@ -63,6 +63,27 @@ function ∫(f::Vector{Float32}, dx::Float32)
     return sum(f.*dx) 
 end
 
+function sfl_grid(field::grid)
+   sfl = zeros(Float32, round(Int, field.n/2))
+   for i in 1:round(Int, field.n/2)
+      sfl[i] += mean((field.U[i,:,:] - field.U[1,:,:]).^2)
+      sfl[i] += mean((field.V[:,i,:] - field.V[:,1,:]).^2)
+      sfl[i] += mean((field.W[:,:,i] - field.W[:,:,1]).^2)
+   end
+   return sfl ./ 3
+end
+
+# TODO: The indexing in this function isn't correct
+# function sft_grid(field::grid)
+#    sft = zeros(Float32, round(Int, field.n/2))
+#    for i in 1:round(Int, field.n/2)
+#       sft[i] += mean((field.U[i,:,:] - field.U[:,1,:]).^2)
+#       sft[i] += mean((field.V[:,i,:] - field.V[1,:,:]).^2)
+#       sft[i] += mean((field.W[:,:,i] - field.W[:,1,:]).^2)
+#    end
+#    return sft ./ 3
+# end
+
 function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32, dim::Int64, nga::Bool)
     npart = length(ps)
     xs = [p.pos for p in ps]
@@ -187,17 +208,6 @@ function uu_cond_r(psn::Vector{part}, nbins::Int64, subset::Tuple{Int64, Bool};
                 scounts += 1
             end
         end
-    # else
-    #     for i ∈ 1:1, j ∈ 1:npart
-    #         r = get_minr(psn[i].pos, psn[j].pos, L)
-    #         rind = floor(Int, r/dr) + 1
-    #         uu[1:3, 1:3, rind] += (usn[i] - mu) * (usn[j] - mu)'
-    #         counts[rind] += 1
-    #         if i == j
-    #             self += (usn[i] - mu) * (usn[j] - mu)'
-    #             scounts += 1
-    #         end
-    #     end
     end
     self /= scounts
     for i in 1:lastindex(counts)

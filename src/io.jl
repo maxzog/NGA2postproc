@@ -248,6 +248,19 @@ function get_parts_dns(dir::String, step::Int64)
     return ps[perm]
 end
 
+function init_parts(n::Int64, pt::String)::Vector{part_dns}
+   """
+   init particle vector for n particles
+       pos, vel, fld all equal to zero
+   """
+   if lowercase(pt) == "crw"
+      ps = [part(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
+   elseif lowercase(pt) == "dns"
+      ps = [part_dns(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
+   end
+   return ps
+end
+
 function init_parts(n::Int64)::Vector{part}
     """
     init particle vector for n particles
