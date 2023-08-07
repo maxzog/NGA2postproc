@@ -154,7 +154,7 @@ function pic_struct_lt_vel(ps::Vector{part_dns}, field::grid, rmax::Float64, nb:
                             q = ps[ni]
                             r = get_minr(p.pos, q.pos, field.L)
                             ir = floor(Int, r/dr) + 1
-                            if p.id != q.id
+                            if true
                                 rl, rt = par_perp_u(p, q)
                                 url = dot(q.vel,rl)-dot(p.vel,rl)
                                 urt = dot(q.vel,rt)-dot(p.vel,rt)
@@ -206,8 +206,12 @@ function pic_struct_lt_vel(ps::Vector{part}, field::grid, rmax::Float64, nb::Int
                             q = ps[ni]
                             r = get_minr(p.pos, q.pos, field.L)
                             ir = floor(Int, r/dr) + 1
-                            if p.id != q.id
-                                rl, rt = par_perp_u(p, q)
+                            if true #p.id != q.id
+                                if p.id != q.id
+                                   rl, rt = par_perp_u(p, q)
+                                else
+                                   rl = zeros(Float32, 3); rt = zeros(Float32, 3)
+                                end 
                                 url = dot(q.vel,rl)-dot(p.vel,rl)
                                 urt = dot(q.vel,rt)-dot(p.vel,rt)
                                 uul[ir] += url*url
@@ -309,8 +313,12 @@ function pic_struct_lt(ps::Vector{part}, field::grid, rmax::Float64, nb::Int64; 
                             q = ps[ni]
                             r = get_minr(p.pos, q.pos, field.L)
                             ir = floor(Int, r/dr) + 1
-                            if p.id != q.id
-                                rl, rt = par_perp_u(p, q)
+                            if true #p.id != q.id
+                                if p.id != q.id
+                                   rl, rt = par_perp_u(p, q)
+                                else
+                                   rl = zeros(Float32, 3); rt = zeros(Float32, 3)
+                                end 
                                 url = dot(q.fld+q.uf,rl)-dot(p.fld+p.uf,rl)
                                 urt = dot(q.fld+q.uf,rt)-dot(p.fld+p.uf,rt)
                                 uul[ir] += url*url

@@ -470,3 +470,20 @@ function read_ps(fn::String)::Vector{part}
     close(io)
     return ps
 end
+
+function blank_grid(n::Int64, L::Float32)::grid
+   arr = zeros(Float32, (2,2,2))
+   return dnsgrid(n, L, L/n, arr, arr, arr, arr)
+end
+
+function jh_part(fn1::String, fn2::String)
+   X = readdlm(fn1, Float32); U = readdlm(fn2, Float32)
+   ps = init_parts(size(X)[1], "DNS")
+   for i in eachindex(ps)
+      p = ps[i]
+      p.fld = U[i,:]
+      p.pos = X[i,:]
+      ps[i] = p
+   end
+   return ps
+end

@@ -105,6 +105,24 @@ function pic_struct_lt(ps::Vector{part_dns}, L::Float32, rmax::Float64, nb::Int6
     return dr, uul, uut, s
 end
 
+function par_perp_gen(r::Vector{Float32}, L::Float32, vel::Vector{Float32})
+    for i in 1:3
+       if r[i] > L/2
+          r[i] -= L
+       end
+       if r[i] < -L/2
+          r[i] += L
+       end
+    end
+    rll = r/norm(r)
+    rt1 = cross(rll,vel) / norm(cross(rll,vel))
+    rt2 = cross(rt1,rll) / norm(cross(rt1,rll))
+    @assert norm(rll)≈1.
+    @assert norm(rt1)≈1.
+    @assert norm(rt2)≈1.
+    return rll, rt2
+end
+
 function par_perp_u(p::part, q::part, L::Float32)
     r = q.pos-p.pos
     for i in 1:3
@@ -316,18 +334,21 @@ function correct_norm(r::Float64)::Float64
 end
 
 function uu_cond_r(ps::Vector{part_dns}, nbins::Int64, L::Float32)
-    uu = zeros(Float32, nbins)
+    uu = zeros(Float32, nbins+1)
     rmax = norm([L/2, L/2, L/2])
     dr = rmax / nbins
-    counts = zeros(Int64, nbins)
+    counts = zeros(Int64, nbins+1)
     scounts = 0
     muf = mean([p.fld for p in ps])
     self = 0.0
     for i ∈ 1:lastindex(ps), j ∈ i:lastindex(ps)
-        r = get_minr(ps[i].pos, ps[j].pos, L)
-        rind = floor(Int, r/dr) + 1
-        uu[rind] += dot(ps[i].fld-muf, ps[j].fld-muf)
-        counts[rind] += 1
+        r = norm(ps[i].pos-ps[j].pos)
+        ir = floor(Int, r/dr) + 1
+        ir > lastindex(uu) ? check = false : check = true
+        if check
+           uu[ir] += dot(ps[i].fld-muf, ps[j].fld-muf)
+           counts[ir] += 1
+        end
         if i == j
             self += dot(ps[i].fld-muf, ps[j].fld-muf)
             scounts += 1
@@ -353,9 +374,11 @@ function uu_lt_cond_r(ps::Vector{part_dns}, nb::Int64, L::Float32)
 
     for i in 1:lastindex(ps), j in i:lastindex(ps)
        p = ps[i]; q = ps[j]
-       r = get_minr(p.pos, q.pos, L)
+       # r = get_minr(p.pos, q.pos, L)
+       r = norm(q.pos-p.pos)
        ir = floor(Int, r/dr) + 1
-       if p.id != q.id
+       ir > lastindex(uul) ? check = false : check = true
+       if p.id != q.id && check
            rl, rt = par_perp_u(p, q)
            uul[ir] += dot(p.fld,rl)*dot(q.fld,rl)
            uut[ir] += dot(p.fld,rt)*dot(q.fld,rt) 
@@ -379,9 +402,7 @@ function sf_lt_cond_r(ps::Vector{part_dns}, nb::Int64, L::Float32)
     sfl = zeros(Float64, nb+1)
     sft = zeros(Float64, nb+1) 
     c  = zeros(Int, nb+1); sc = 0; s = 0.
-    @printf("\nStarting")
     for i in 1:lastindex(ps)
-       @printf("\nParticle i :: %i", i)
        for j in i:lastindex(ps)
          p = ps[i]; q = ps[j]
          # r = get_minr(p.pos, q.pos, L)
@@ -397,6 +418,36 @@ function sf_lt_cond_r(ps::Vector{part_dns}, nb::Int64, L::Float32)
          if q.id == p.id
              s += dot(q.fld - p.fld, q.fld - p.fld)
              sc += 1
+         end
+      end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    sfl = sfl./c; sft = sft./c; s = s/(3*sc)
+    return dr, sfl, sft, s
+end
+
+function general_structure(pos::Vector{Vector{Float32}}, vel::Vector{Vector{Float32}}, nb::Int64, L::Float32)
+    rmax = norm([L/2 L/2 L/2])
+    dr = rmax/nb
+    rv = 0:dr:rmax
+    sfl = zeros(Float64, nb+1)
+    sft = zeros(Float64, nb+1) 
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+    for i in 1:lastindex(pos)
+       for j in i:lastindex(pos)
+         # r = get_minr(p.pos, q.pos, L)
+         r = norm(pos[j]-pos[i])
+         ir = floor(Int, r/dr) + 1
+         ir > lastindex(sfl) ? check = false : check = true
+         if i != j && check
+            rl, rt = par_perp_gen(pos[j]-pos[i], L, vel[i])
+            sfl[ir] += dot(vel[j]-vel[i], rl) * dot(vel[j]-vel[i],rl)
+            sft[ir] += dot(vel[j]-vel[i], rt) * dot(vel[j]-vel[i],rt) 
+            c[ir]  += 1
+         end
+         if i == j
+            s += dot(vel[j]-vel[i], vel[j]-vel[i])
+            sc += 1
          end
       end
     end
