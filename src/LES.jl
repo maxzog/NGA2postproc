@@ -1,13 +1,13 @@
 
 function spectral!(hit::lesgrid)
     p = plan_fft(hit.U)
-    hit.Uk = p*hit.U; hit.Vk = p*hit.V; hit.Wk = p*hit.W; hit.Pk = p*hit.P
+    hit.Uk = p*hit.U; hit.Vk = p*hit.V; hit.Wk = p*hit.W
     return 
 end
 
 function ispectral!(hit::lesgrid)
     ip = plan_ifft(hit.Uf)
-    hit.Uk=ip*hit.Uk; hit.Vk=ip*hit.Vk; hit.Wk=ip*hit.Wk; hit.Pk=ip*hit.Pk
+    hit.Uk=ip*hit.Uk; hit.Vk=ip*hit.Vk; hit.Wk=ip*hit.Wk
     return 
 end
 
@@ -19,7 +19,6 @@ function tophat_spec!(hit::lesgrid, kv::Vector{Int64})
             hit.Uk[i,j,k] *= G 
             hit.Vk[i,j,k] *= G 
             hit.Wk[i,j,k] *= G 
-            hit.Pk[i,j,k] *= G
         end
     end
     return 
@@ -33,7 +32,6 @@ function sharpspec!(hit::lesgrid, kv::Vector{Int64})
             hit.Uk[i,j,k] = 0.0
             hit.Vk[i,j,k] = 0.0
             hit.Wk[i,j,k] = 0.0
-            hit.Pk[i,j,k] = 0.0
         end
     end
     return 
@@ -46,7 +44,6 @@ function gaussian_spec!(hit::lesgrid, kv::Vector{Int64})
         hit.Uk[i,j,k] *= G
         hit.Vk[i,j,k] *= G
         hit.Wk[i,j,k] *= G
-        hit.Pk[i,j,k] *= G
     end
     return 
 end
@@ -112,11 +109,11 @@ end
 
 function LES(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
    Δf = δ * hit.L / hit.n
-   les = lesgrid(ftype, false, hit.n, hit.L, hit.Δ, Δf, π/Δf, hit.U, hit.V, hit.W, hit.P,
+   les = lesgrid(ftype, false, hit.n, hit.L, hit.Δ, Δf, π/Δf, hit.U, hit.V, hit.W, 
                  zeros(Float32, hit.n, hit.n, hit.n),zeros(Float32, hit.n, hit.n, hit.n),
-                 zeros(Float32, hit.n, hit.n, hit.n),zeros(Float32, hit.n, hit.n, hit.n),
+                 zeros(Float32, hit.n, hit.n, hit.n),
                  zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n),
-                 zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n))
+                 zeros(Complex{Float32}, hit.n, hit.n, hit.n))
    spectralfilter!(les)
    # check imag(z) << 1
    println(maximum(imag(les.Uk)))
@@ -127,7 +124,7 @@ function LES(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
    @assert maximum(imag(les.Wk)) < eps
    @assert minimum(imag(les.Wk)) > -eps
 
-   les.Uf=real(les.Uk); les.Vf=real(les.Vk); les.Wf=real(les.Wk); les.Pf=real(les.Pk);
+   les.Uf=real(les.Uk); les.Vf=real(les.Vk); les.Wf=real(les.Wk); 
    return les
 end
 
@@ -172,7 +169,7 @@ function totKE(U, V, W, n)::Float32
 end
 
 # THIS DOES NOT WORK
-function data2part(X,hit::grid)::Vector{Float64}
+function data2part(X,hit::grid)::Vector{Float6}     4
     vel = Vector{Float64}(undef, 3)
 
     ip=ceil(Int64, X[1]/hit.Δ)

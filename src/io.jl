@@ -40,17 +40,14 @@ mutable struct lesgrid<:grid
     U :: Array{Float32}
     V :: Array{Float32}
     W :: Array{Float32}
-    P :: Array{Float32}
 
     Uf :: Array{Float32}
     Vf :: Array{Float32}
     Wf :: Array{Float32}
-    Pf :: Array{Float32}
 
     Uk :: Array{Complex{Float32}}
     Vk :: Array{Complex{Float32}}
     Wk :: Array{Complex{Float32}}
-    Pk :: Array{Complex{Float32}}
 end
 
 struct mon
@@ -487,3 +484,6 @@ function jh_part(fn1::String, fn2::String)
    end
    return ps
 end
+
+
+
