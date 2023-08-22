@@ -346,3 +346,34 @@ function scalar2part(X,xm,ym,zm,U)::Float32
     ug= wwd[1,1,1]*U[i1,j1,k1]+wwd[2,1,1]*U[i2,j1,k1]+wwd[1,2,1]*U[i1,j2,k1]+wwd[2,2,1]*U[i2,j2,k1]+wwd[1,1,2]*U[i1,j1,k2]+wwd[2,1,2]*U[i2,j1,k2]+wwd[1,2,2]*U[i1,j2,k2]+ wwd[2,2,2]*U[i2,j2,k2]
     return ug
 end
+
+function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+   n = floor(xiv[1] / field.Δ)
+   p = floor(xiv[2] / field.Δ)
+   q = floor(xiv[3] / field.Δ)
+   xv = LinRange(0.0f0, field.L, field.n)
+   rvec = zeros(Float32, 3)
+   for i in 1:4, j in 1:4, k in 1:4
+      ii = n-2+i
+      jj = p-2+j
+      kk = q-2+k
+      lx = get_Lag4poly(xv, n, xiv[1], ii)
+      ly = get_Lag4poly(xv, p, xiv[2], jj)
+      lz = get_Lag4poly(xv, q, xiv[3], kk)
+      rvec[1] += field.U[ii, jj, kk] * lx * ly * lz
+      rvec[2] += field.V[ii, jj, kk] * lx * ly * lz
+      rvec[3] += field.W[ii, jj, kk] * lx * ly * lz
+   end
+   return rvec
+end
+
+function get_Lag4poly(xv::Vector{Float32}, ind::Int64, xi::Float32, i::Int64)
+   num = 1.0; den = 1.0
+   for j in ind-1:ind+2
+      if i != j
+         num *= (xi - xv[j])
+         den *= (xv[i] - xv[j])
+      end
+   end
+   return num/den
+end   
