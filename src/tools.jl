@@ -348,9 +348,9 @@ function scalar2part(X,xm,ym,zm,U)::Float32
 end
 
 function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}   
-   n = floor(xiv[1] / field.Δ)
-   p = floor(xiv[2] / field.Δ)
-   q = floor(xiv[3] / field.Δ)
+   n = floor(Int64, xiv[1] / field.Δ)
+   p = floor(Int64, xiv[2] / field.Δ)
+   q = floor(Int64, xiv[3] / field.Δ)
    xv = LinRange(0.0f0, field.L, field.n)
    rvec = zeros(Float32, 3)
    for i in 1:4, j in 1:4, k in 1:4
@@ -367,7 +367,7 @@ function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}
    return rvec
 end
 
-function get_Lag4poly(xv::Vector{Float32}, ind::Int64, xi::Float32, i::Int64)
+function get_Lag4poly(xv::LinRange{Float32}, ind::Int64, xi::Float32, i::Int64)
    num = 1.0; den = 1.0
    for j in ind-1:ind+2
       if i != j
