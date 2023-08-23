@@ -347,7 +347,12 @@ function scalar2part(X,xm,ym,zm,U)::Float32
     return ug
 end
 
-function Lag4Interp(field::testgrid, xiv::Vector{Float32})::Vector{Float32}   
+function Lag4InterpTest(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+   for i in eachindex(xiv)
+      if xiv[i] > field.L-field.Δ
+         xiv[i] -= field.L
+      end
+   end
    n = floor(Int64, xiv[1] / field.Δ)
    p = floor(Int64, xiv[2] / field.Δ)
    q = floor(Int64, xiv[3] / field.Δ)
@@ -357,7 +362,7 @@ function Lag4Interp(field::testgrid, xiv::Vector{Float32})::Vector{Float32}
       ii = n-2+i
       jj = p-2+j
       kk = q-2+k
-
+      
       lx = get_Lag4poly(xv, n, xiv[1], ii)
       ly = get_Lag4poly(xv, p, xiv[2], jj)
       lz = get_Lag4poly(xv, q, xiv[3], kk)
@@ -369,6 +374,11 @@ function Lag4Interp(field::testgrid, xiv::Vector{Float32})::Vector{Float32}
 end
 
 function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+   for i in eachindex(xiv)
+      if xiv[i] > field.L-field.Δ
+         xiv[i] -= field.L
+      end
+   end
    n = floor(Int64, xiv[1] / field.Δ)
    p = floor(Int64, xiv[2] / field.Δ)
    q = floor(Int64, xiv[3] / field.Δ)
@@ -391,7 +401,10 @@ end
 
 function get_Lag4poly(xv::LinRange{Float32}, ind::Int64, xi::Float32, i::Int64)
    num = 1.0; den = 1.0
+   n = lastindex(xv)
    for j in ind-1:ind+2
+      j > n ? j -= n : nothing
+      i > n ? i -= n : nothing
       if i != j
          num *= (xi - xv[j])
          den *= (xv[i] - xv[j])
