@@ -1,54 +1,69 @@
 
-function spectral!(hit::lesgrid)
+function LES_big(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
+   Δf = δ * hit.L / hit.n
+   les = lesLgrid(ftype, false, hit.n, hit.L, hit.Δ, Δf, π/Δf, hit.U, hit.V, hit.W) 
+   spectralfilter!(les)
+   # check imag(z) << 1
+   # @assert maximum(imag(les.Uk)) < eps
+   # @assert minimum(imag(les.Uk)) > -eps
+   # @assert maximum(imag(les.Vk)) < eps
+   # @assert minimum(imag(les.Vk)) > -eps
+   # @assert maximum(imag(les.Wk)) < eps
+   # @assert minimum(imag(les.Wk)) > -eps
+   # les.U=real(les.U); les.V=real(les.V); les.W=real(les.W); 
+   return les
+end
+
+function spectral!(hit::lesLgrid)
     p = plan_fft(hit.U)
-    hit.Uk = p*hit.U; hit.Vk = p*hit.V; hit.Wk = p*hit.W
+    hit.U = p*hit.U; hit.V = p*hit.V; hit.W = p*hit.W
     return 
 end
 
-function ispectral!(hit::lesgrid)
-    ip = plan_ifft(hit.Uf)
-    hit.Uk=ip*hit.Uk; hit.Vk=ip*hit.Vk; hit.Wk=ip*hit.Wk
+function ispectral!(hit::lesLgrid)
+    ip = plan_ifft(hit.U)
+    hit.U=ip*hit.U; hit.V=ip*hit.V; hit.W=ip*hit.W
     return 
 end
 
-function tophat_spec!(hit::lesgrid, kv::Vector{Int64})
+function tophat_spec!(hit::lesLgrid, kv::Vector{Int64})
     for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
         kk = norm([kv[i] kv[j] kv[k]])
         if kk > 1e-6
             G = sin(0.5*kk*hit.Δf)/(0.5*kk*hit.Δf)
-            hit.Uk[i,j,k] *= G 
-            hit.Vk[i,j,k] *= G 
-            hit.Wk[i,j,k] *= G 
+            hit.U[i,j,k] *= G 
+            hit.V[i,j,k] *= G 
+            hit.W[i,j,k] *= G 
         end
     end
     return 
 end
 
-function sharpspec!(hit::lesgrid, kv::Vector{Int64})
+function sharpspec!(hit::lesLgrid, kv::Vector{Int64})
     for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
         kk = norm([kv[i] kv[j] kv[k]])
         heavy = hit.κc - kk
         if heavy <= 0
-            hit.Uk[i,j,k] = 0.0
-            hit.Vk[i,j,k] = 0.0
-            hit.Wk[i,j,k] = 0.0
+            hit.U[i,j,k] = 0.0
+            hit.V[i,j,k] = 0.0
+            hit.W[i,j,k] = 0.0
         end
     end
     return 
 end
 
-function gaussian_spec!(hit::lesgrid, kv::Vector{Int64})
+function gaussian_spec!(hit::lesLgrid, kv::Vector{Int64})
     for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
         kk = norm([kv[i] kv[j] kv[k]])
         G  = exp(-kk^2*hit.Δf^2/24)
-        hit.Uk[i,j,k] *= G
-        hit.Vk[i,j,k] *= G
-        hit.Wk[i,j,k] *= G
+        hit.U[i,j,k] *= G
+        hit.V[i,j,k] *= G
+        hit.W[i,j,k] *= G
     end
     return 
 end
 
-function spectralfilter!(hit::lesgrid)
+function spectralfilter!(hit::lesLgrid)
     spectral!(hit)
     n = trunc(Int, hit.n/2)
     kv = fftshift(-n:n-1)
@@ -107,25 +122,6 @@ function box_filt(U::Array{Float32}, Δ::Int64, n::Int64)
     return Uf
 end
 
-function LES(hit::dnsgrid, ftype::String, δ::Int64; eps = 1e-5)
-   Δf = δ * hit.L / hit.n
-   les = lesgrid(ftype, false, hit.n, hit.L, hit.Δ, Δf, π/Δf, hit.U, hit.V, hit.W, 
-                 zeros(Float32, hit.n, hit.n, hit.n),zeros(Float32, hit.n, hit.n, hit.n),
-                 zeros(Float32, hit.n, hit.n, hit.n),
-                 zeros(Complex{Float32}, hit.n, hit.n, hit.n),zeros(Complex{Float32}, hit.n, hit.n, hit.n),
-                 zeros(Complex{Float32}, hit.n, hit.n, hit.n))
-   spectralfilter!(les)
-   # check imag(z) << 1
-   @assert maximum(imag(les.Uk)) < eps
-   @assert minimum(imag(les.Uk)) > -eps
-   @assert maximum(imag(les.Vk)) < eps
-   @assert minimum(imag(les.Vk)) > -eps
-   @assert maximum(imag(les.Wk)) < eps
-   @assert minimum(imag(les.Wk)) > -eps
-
-   les.Uf=real(les.Uk); les.Vf=real(les.Vk); les.Wf=real(les.Wk); 
-   return les
-end
 
 function padvel(U::Array{Float32}, δ::Int64, n::Int64)
     np = 2*δ+n

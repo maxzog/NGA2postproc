@@ -50,6 +50,21 @@ mutable struct lesgrid<:grid
     Wk :: Array{Complex{Float32}}
 end
 
+mutable struct lesLgrid<:grid
+    ftype :: String
+    isFiltered :: Bool
+
+    n  :: Int64
+    L  :: Float32
+    Δ  :: Float32
+    Δf :: Float32
+    κc :: Float32
+
+    U :: Array{Complex{Float32}}
+    V :: Array{Complex{Float32}}
+    W :: Array{Complex{Float32}}
+end
+
 struct mon
     Reλ    :: Vector{Float32}
     TKE    :: Vector{Float32}
@@ -278,6 +293,17 @@ function read_P(fn::String, n::Int64)::Array{Float32}
     return arr
 end
 
+function read_P(fn::String, nx::Int32, ny::Int32, nz::Int32)::Array{Float32}
+    """
+    Reads pressure... what else do you want from me?
+    """
+    arr = Array{Float32}(undef, (nx,ny,nz))
+    io = open(fn)
+    skip(io, 244)
+    read!(io, arr); close(io)
+    return arr
+end
+
 function read_vec(fn::String, n::Int32)::Vector{Float32}
     """
     Reads ensight particle data files and outputs a vector of particle scalar data
@@ -324,6 +350,22 @@ function read_vel(fn::String, n::Int64)::Tuple{Array{Float32}, Array{Float32}, A
     U = Array{Float32}(undef, (n,n,n))
     V = Array{Float32}(undef, (n,n,n))
     W = Array{Float32}(undef, (n,n,n))
+    io = open(fn)
+    skip(io, 244)
+    read!(io, U)
+    read!(io, V)
+    read!(io, W)
+    return U, V, W
+end
+
+function read_vel(fn::String, nx::Int32, ny::Int32, nz::Int32)::Tuple{Array{Float32}, Array{Float32}, Array{Float32}}
+    """
+    Reads velocity field
+    Returns three arrays (U, V, W)
+    """
+    U = Array{Float32}(undef, (nx,ny,nz))
+    V = Array{Float32}(undef, (nx,ny,nz))
+    W = Array{Float32}(undef, (nx,ny,nz))
     io = open(fn)
     skip(io, 244)
     read!(io, U)
