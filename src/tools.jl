@@ -347,16 +347,38 @@ function scalar2part(X,xm,ym,zm,U)::Float32
     return ug
 end
 
-function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+function Lag4Interp(field::testgrid, xiv::Vector{Float32})::Vector{Float32}   
    n = floor(Int64, xiv[1] / field.Δ)
    p = floor(Int64, xiv[2] / field.Δ)
    q = floor(Int64, xiv[3] / field.Δ)
-   xv = LinRange(0.0f0, field.L, field.n)
+   xv = LinRange(0.0f0, field.L-field.Δ,field.n)
    rvec = zeros(Float32, 3)
    for i in 1:4, j in 1:4, k in 1:4
       ii = n-2+i
       jj = p-2+j
       kk = q-2+k
+
+      lx = get_Lag4poly(xv, n, xiv[1], ii)
+      ly = get_Lag4poly(xv, p, xiv[2], jj)
+      lz = get_Lag4poly(xv, q, xiv[3], kk)
+      rvec[1] += field.U[ii, jj, kk] * lx * ly * lz
+      rvec[2] += field.V[ii, jj, kk] * lx * ly * lz
+      rvec[3] += field.W[ii, jj, kk] * lx * ly * lz
+   end
+   return rvec
+end
+
+function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+   n = floor(Int64, xiv[1] / field.Δ)
+   p = floor(Int64, xiv[2] / field.Δ)
+   q = floor(Int64, xiv[3] / field.Δ)
+   xv = LinRange(0.0f0, field.L-field.Δ,field.n)
+   rvec = zeros(Float32, 3)
+   for i in 1:4, j in 1:4, k in 1:4
+      ii = n-2+i
+      jj = p-2+j
+      kk = q-2+k
+
       lx = get_Lag4poly(xv, n, xiv[1], ii)
       ly = get_Lag4poly(xv, p, xiv[2], jj)
       lz = get_Lag4poly(xv, q, xiv[3], kk)

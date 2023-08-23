@@ -927,6 +927,16 @@ end
 
 function get_ijk(p::part_dns, n::Int64, Δ::Float32)::Tuple{Int64, Int64, Int64}
     i, j, k = trunc.(Int64, ceil.(p.pos ./ Δ))
+    if i >= n || i <= 1
+      println(i)
+      println(p.pos)
+    elseif j >= n || j <= 1
+      println(j)
+      println(p.pos)
+    elseif k >= n || k <= 1
+      println(k)
+      println(p.pos)
+    end
     @assert i <= n; @assert i>=1
     @assert j <= n; @assert j>=1
     @assert k <= n; @assert k>=1
