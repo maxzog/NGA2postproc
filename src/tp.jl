@@ -84,6 +84,35 @@ end
 #    return sft ./ 3
 # end
 
+function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32)
+    npart = length(ps)
+    rmax = norm([L/2 for i in 1:3])
+    dr = rmax / nbins
+    rv = 0:dr:rmax
+    rdf = zeros(nbins)
+    V = L^3 
+    ρ = N/V
+    for i ∈ 1:npart
+        for j ∈ i:npart
+            if i != j
+               r = norm(ps[i].pos - ps[j].pos)
+               rind = floor(Int, r/dr) + 1
+               rind < nbins : rdf[rind] += 1 : nothing 
+            end
+        end
+    end
+    
+    for (i, bin) in enumerate(rdf)
+        r = (rv[i] + rv[i+1])/2
+        den = 4/3*π*(rv[i+1]^3 - rv[i]^3)
+        if dim == 2
+            den = π * (rv[i+1]^2 - rv[i]^2)
+        end
+        rdf[i] = bin/(den*ρ)
+    end
+    return dr/2:dr:rmax-dr/2, rdf
+end
+
 function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32, dim::Int64, nga::Bool)
     npart = length(ps)
     xs = [p.pos for p in ps]
@@ -123,17 +152,6 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32, dim::Int64, nga::Bo
     for (i, bin) in enumerate(rdf)
         r = (rv[i] + rv[i+1])/2
         den = 4/3*π*(rv[i+1]^3 - rv[i]^3)
-
-        # The rdf still gets funky past rmax/2... Tried adding corrections from online doc, not working
-
-        # if r < rmax/2
-        #     den = 4*π*r^2 * dr
-        # elseif r < sqrt(2)*rmax/2
-        #     den = 2*π*r*(3-4*r)
-        # else
-        #     den = 2*r*(3*π -12*f₁(r) + f₂(r))
-        # end
-
         if dim == 2
             den = π * (rv[i+1]^2 - rv[i]^2)
         end

@@ -9,34 +9,100 @@ mutable struct pjetgrid<:grid
     xv :: Vector{Float32}
     yv :: Vector{Float32}
     zv :: Vector{Float32}
+    dxm :: Float32
+    dym :: Float32
+    dzm :: Float32
     U :: Array{Float32}
     V :: Array{Float32}
     W :: Array{Float32}
-    P :: Array{Float32}
+    wX :: Array{Float32}
+    wY :: Array{Float32}
+    wZ :: Array{Float32}
+end
+
+mutable struct pipegrid<:grid
+    nx :: Int64
+    ny :: Int64
+    nz :: Int64
+    Lx :: Float32
+    Ly :: Float32
+    Lz :: Float32
+    D  :: Float32
+    xv :: Vector{Float32}
+    yv :: Vector{Float32}
+    zv :: Vector{Float32}
+    dxm :: Float32
+    dym :: Float32
+    dzm :: Float32
+    U :: Array{Float32}
+    V :: Array{Float32}
+    W :: Array{Float32}
+end
+
+mutable struct radialgrid<:grid
+   nx :: Int64
+   ny :: Int64
+   Lx :: Float32
+   Ly :: Float32
+   xv :: Vector{Float32}
+   yv :: Vector{Float32}
+   U :: Array{Float32}
+   V :: Array{Float32}
+   W :: Array{Float32}
+   wX :: Array{Float32}
+   wY :: Array{Float32}
+   wZ :: Array{Float32}
+   Urms :: Array{Float32}
+   Vrms :: Array{Float32}
+   Wrms :: Array{Float32}
 end
 
 function get_pjet(fn::String, step::Int64)
    """
-   Reads NGA2 binary data files and returns a grid type containing the stored data fields
+   Reads NGA2 ensight files and returns a grid type containing the stored data fields
    """
 
    step = string(step)
 
    nx, ny, nz, xv, yv, zv = read_mesh(fn)
    Lx = xv[end]-xv[1]
-   Ly = yv[end]-yv[1]
-   Lz = zv[end]-zv[1]
+   Ly = yv[end-1]-yv[1]
+   Lz = zv[end-1]-zv[1]
+
+   dxm = mean(xv[2:end] - xv[1:end-1])
+   dym = mean(yv[2:end] - yv[1:end-1])
+   dzm = mean(zv[2:end] - zv[1:end-1])
 
    fnv = fn*"/velocity/velocity." * "0"^(6-length(step)) * step
-   fnp = fn*"/pressure/pressure." * "0"^(6-length(step)) * step
+   fnw = fn*"/vorticity/vorticity." * "0"^(6-length(step)) * step
 
    U, V, W = read_vel(fnv, nx, ny, nz)
-   # P = read_P(fnp, nx, ny, nz)
-   P = Array{Float32}(undef, (nx, ny, nz))
-   return pjetgrid(nx, ny, nz, Lx, Ly, Lz, xv, yv, zv, 
-                   U, V, W, P)
+   vortX, vortY, vortZ = read_vel(fnw, nx, ny, nz)
+   return pjetgrid(nx, ny, nz, Lx, Ly, Lz, xv, yv, zv, dxm, dym, dzm,
+                   U, V, W, vortX, vortY, vortZ)
 end
+
+function get_pipe(fn::String, step::Int64) 
+   """
+   Reads NGA2 ensight files and returns a grid type containing the stored data fields
+   """
    
+   step = string(step)
+   nx, ny, nz, xv, yv, zv = read_mesh(fn)
+   Lx = xv[end]-xv[1]
+   Ly = yv[end]-yv[1]
+   Lz = zv[end]-zv[1]
+   
+   dxm = xv[2] - xv[1]
+   dym = yv[2] - yv[1]
+   dzm = zv[2] - zv[1]
+
+   fnv = fn*"/velocity/velocity." * "0"^(6-length(step)) * step
+   U, V, W = read_vel(fnv, nx, ny, nz)
+
+   return pipegrid(nx, ny, nz, Lx, Ly, Lz, 0.0f0, xv, yv, zv, dxm, dym, dzm,
+                   U, V, W)
+end
 
 function read_mesh(fn::String)
    ## Read the mesh
