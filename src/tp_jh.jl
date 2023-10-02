@@ -426,6 +426,37 @@ function sf_lt_cond_r(ps::Vector{part_dns}, nb::Int64, L::Float32)
     return dr, sfl, sft, s
 end
 
+function sf_lt_cond_r(ps::Vector{part}, nb::Int64, L::Float32)
+    re_id!(ps)
+    rmax = norm([L/2 L/2 L/2])
+    dr = rmax/nb
+    rv = 0:dr:rmax
+    sfl = zeros(Float64, nb+1)
+    sft = zeros(Float64, nb+1) 
+    c  = zeros(Int, nb+1); sc = 0; s = 0.
+    for i in 1:lastindex(ps)
+       for j in i:lastindex(ps)
+         p = ps[i]; q = ps[j]
+         # r = get_minr(p.pos, q.pos, L)
+         r = norm(q.pos-p.pos)
+         ir = floor(Int, r/dr) + 1
+         ir > lastindex(sfl) ? check = false : check = true
+         if p.id != q.id && check
+             rl, rt = par_perp_u(p, q, L)
+             sfl[ir] += dot(q.uf - p.uf, rl) * dot(q.uf - p.uf,rl)
+             sft[ir] += dot(q.uf - p.uf, rt) * dot(q.uf - p.uf,rt) 
+             c[ir]  += 1
+         end
+         if q.id == p.id
+             s += dot(q.uf - p.uf, q.uf - p.uf)
+             sc += 1
+         end
+      end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    sfl = sfl./c; sft = sft./c; s = s/(3*sc)
+    return dr, sfl, sft, s
+end
 function general_structure(pos::Vector{Vector{Float32}}, vel::Vector{Vector{Float32}}, nb::Int64, L::Float32)
     rmax = norm([L/2 L/2 L/2])
     dr = rmax/nb
