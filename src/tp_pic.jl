@@ -232,9 +232,9 @@ function pic_struct_lt_vel(ps::Vector{part}, field::grid, rmax::Float64, nb::Int
     uul = uul./c; uut = uut./c; s = s/(3*sc)
     return dr, uul, uut, s
 end
-function pic_struct_lt(ps::Vector{part_dns}, field::grid, rmax::Float64, nb::Int64; ncells=16)
+function pic_struct_lt(ps::Vector{part_dns}, L::Float32, rmax::Float64, nb::Int64; ncells=16)
     re_id!(ps)
-    Δ = field.L / ncells
+    Δ = L / ncells
     npic, ipic = part_grid(ps, Δ, ncells)
     np = lastindex(ps)
     @assert sum(npic) == np

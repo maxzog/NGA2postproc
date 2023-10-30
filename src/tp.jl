@@ -97,7 +97,10 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32)
             if i != j
                r = norm(ps[i].pos - ps[j].pos)
                rind = floor(Int, r/dr) + 1
-               rind < nbins : rdf[rind] += 1 : nothing 
+               check = rind < nbins
+               if check
+                  rdf[rind] += 1
+               end
             end
         end
     end

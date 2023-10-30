@@ -66,8 +66,8 @@ function get_pjet(fn::String, step::Int64)
 
    nx, ny, nz, xv, yv, zv = read_mesh(fn)
    Lx = xv[end]-xv[1]
-   Ly = yv[end-1]-yv[1]
-   Lz = zv[end-1]-zv[1]
+   Ly = yv[end]-yv[1]
+   Lz = zv[end]-zv[1]
 
    dxm = mean(xv[2:end] - xv[1:end-1])
    dym = mean(yv[2:end] - yv[1:end-1])
