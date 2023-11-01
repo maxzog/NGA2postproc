@@ -9,6 +9,9 @@ mutable struct pjetgrid<:grid
     xv :: Vector{Float32}
     yv :: Vector{Float32}
     zv :: Vector{Float32}
+    xvm :: Vector{Float32}
+    yvm :: Vector{Float32}
+    zvm :: Vector{Float32}
     dxm :: Float32
     dym :: Float32
     dzm :: Float32
@@ -69,6 +72,11 @@ function get_pjet(fn::String, step::Int64)
    Ly = yv[end]-yv[1]
    Lz = zv[end]-zv[1]
 
+   xvm = (xv[2:end] .+ xv[1:end-1]) / 2
+   yvm = (yv[2:end] .+ yv[1:end-1]) / 2
+   zvm = (zv[2:end] .+ zv[1:end-1]) / 2
+   
+
    dxm = mean(xv[2:end] - xv[1:end-1])
    dym = mean(yv[2:end] - yv[1:end-1])
    dzm = mean(zv[2:end] - zv[1:end-1])
@@ -78,7 +86,7 @@ function get_pjet(fn::String, step::Int64)
 
    U, V, W = read_vel(fnv, nx, ny, nz)
    vortX, vortY, vortZ = read_vel(fnw, nx, ny, nz)
-   return pjetgrid(nx, ny, nz, Lx, Ly, Lz, xv, yv, zv, dxm, dym, dzm,
+   return pjetgrid(nx, ny, nz, Lx, Ly, Lz, xv, yv, zv, xvm, yvm, zvm, dxm, dym, dzm,
                    U, V, W, vortX, vortY, vortZ)
 end
 

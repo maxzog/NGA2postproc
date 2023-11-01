@@ -5,7 +5,7 @@ function get_radial_average(fn::String, step::Int64, nx::Int64, ny::Int64, nt::I
    # pjet.V .= 1.0f0
    # pjet.W .= 1.0f0
    xv = LinRange(0.0f0, 0.254f0, nx)
-   rv = LinRange(-2.5f0 * 0.0254f0, 2.5f0 * 0.0254f0, ny)
+   rv = LinRange(-2.45f0 * 0.0254f0, 2.45f0 * 0.0254f0, ny)
    tmp = Array{Float32}(undef, (nx, ny))
    avg = radialgrid(nx, ny, maximum(xv), rv[end]-rv[1], xv, rv, 
                     Array{Float32}(undef, (nx, ny)), Array{Float32}(undef, (nx, ny)), Array{Float32}(undef, (nx, ny)), 
@@ -48,6 +48,52 @@ function get_radial_average(fn::String, step::Int64, nx::Int64, ny::Int64, nt::I
       avg.Wrms[i,j] = sqrt(meanW / nt)
       meanU = 0.0f0; meanV = 0.0f0; meanW = 0.0f0
       meanwX = 0.0f0; meanwY = 0.0f0; meanwZ = 0.0f0
+   end
+   return avg
+end
+
+function get_radial_avg(pjet::grid)    
+   avg = radialgrid(pjet.nx, pjet.ny, pjet.Lx, pjet.Ly, pjet.xv, pjet.yv, 
+                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), 
+                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), 
+                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)))
+   tmp = zeros(Int64, (pjet.nx, pjet.ny))
+   for k in 1:pjet.nz
+      for j in 1:pjet.ny
+         for i in 1:pjet.nx 
+            r = norm([pjet.yv[j], pjet.zv[k]])
+            jj = floor(Int64, r / pjet.dym) + 1
+            @assert(typeof(jj) == Int64)
+            if sign(pjet.yv[j]) == -1
+               jj = trunc(Int, pjet.ny/2) - jj
+            elseif jj == 1
+               jj = trunc(Int, pjet.ny/2)
+            elseif sign(pjet.yv[j]) == 1
+               jj = trunc(Int, pjet.ny/2) + jj
+            end 
+            if jj > 0 && jj < pjet.ny
+               avg.U[i,jj] += pjet.U[i,j,k]
+               avg.V[i,jj] += pjet.V[i,j,k]
+               avg.W[i,jj] += pjet.W[i,j,k]
+               avg.wX[i,jj] += pjet.wX[i,j,k]
+               avg.wY[i,jj] += pjet.wY[i,j,k]
+               avg.wZ[i,jj] += pjet.wZ[i,j,k]
+               tmp[i,jj] += 1
+            end
+         end
+      end
+   end
+   for j in 1:pjet.ny
+      for i in 1:pjet.nx
+         if tmp[i,j] != 0
+            avg.U[i,j]  /= tmp[i,j]
+            avg.V[i,j]  /= tmp[i,j]
+            avg.W[i,j]  /= tmp[i,j]
+            avg.wX[i,j] /= tmp[i,j]
+            avg.wY[i,j] /= tmp[i,j]
+            avg.wZ[i,j] /= tmp[i,j]
+         end
+      end 
    end
    return avg
 end
