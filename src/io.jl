@@ -90,12 +90,22 @@ mutable struct part_dns{Float32}<:Particle{Float32}
 end
 
 mutable struct ou_part{Float32}<:Particle{Float32}
+    id   :: Int64
+    pos  :: Vector{Float32}
+    vel  :: Vector{Float32}
+    fld  :: Vector{Float32}
+    dW   :: Vector{Float32}
+    tau  :: Float32
+    sig  :: Float32
+    taup :: Float32
+    d    :: Float32
+end
+
+mutable struct pjet_part{Float32}<:Particle{Float32}
     id  :: Int64
+    d   :: Float32
     pos :: Vector{Float32}
     vel :: Vector{Float32}
-    fld :: Vector{Float32}
-    a   :: Float32
-    b   :: Float32
 end
 
 Base.copy(hit::dnsgrid) = dnsgrid(hit.n, hit.L, hit.Δ, hit.U, hit.V, hit.W, hit.P)
@@ -212,11 +222,9 @@ function get_parts_ou(dir::String, step::Int64)::Vector{ou_part}
     U  = read_arr(dir*"fld"*suf, np)
     V  = read_arr(dir*"vel"*suf, np)
     ids= read_vec(dir*"id"*suf, np)
-    as = read_vec(dir*"a_crw"*suf, np)
-    bs = read_vec(dir*"b_crw"*suf, np)
     ps = Vector{ou_part}(undef, np)
     for i in 1:np
-        ps[i] = ou_part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], as[i], bs[i])
+       ps[i] = ou_part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], [0.0f0,0.0f0,0.0f0], 0.0f0, 0.0f0)
     end
     perm = sortperm([p.id for p in ps])
     return ps[perm]
@@ -255,6 +263,25 @@ function get_parts_dns(dir::String, step::Int64)
     ps = Vector{part_dns}(undef, np)
     for i in 1:np
         ps[i] = part_dns(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i])
+    end
+    perm = sortperm([p.id for p in ps])
+    return ps[perm]
+end
+
+function get_parts_pjet(dir::String, step::Int64)
+    """
+    Returns vector of particles with id, diameter, position, particle velocity, and fldvel seen
+    """
+    suf = "."*"0"^(6-length(string(step)))*string(step)
+    np = get_npart(dir*"particle"*suf)
+    X  = read_pos(dir*"particle"*suf, np)
+    # U  = read_arr(dir*"fld"*suf, np)
+    V  = read_arr(dir*"vel"*suf, np)
+    ids= read_vec(dir*"id"*suf, np)
+    ds = read_vec(dir*"diameter"*suf, np)
+    ps = Vector{pjet_part}(undef, np)
+    for i in 1:np
+       ps[i] = pjet_part(trunc(Int64, ids[i]), ds[i], X[:,i], V[:,i]) #, U[:,i])
     end
     perm = sortperm([p.id for p in ps])
     return ps[perm]
@@ -444,6 +471,53 @@ function read_mon_col(fn::String, col::String)::Vector{Float32}
     return arr[lastindex(ls)-final_step(ls):end]
 end
 
+function write_ps(ps::Vector{ou_part{Float32}}, fn::String)
+    io = open(fn, "w")
+    write(io, Int32(lastindex(ps))) # write number of particles
+    for p in ps
+        write(io, p.id)
+        write(io, p.pos)
+        write(io, p.vel)
+        write(io, p.fld)
+        write(io, p.dW)
+        write(io, p.tau)
+        write(io, p.sig)
+        write(io, p.taup)
+        write(io, p.d)
+    end
+    close(io)
+    return
+end
+
+function read_ps_ou(fn::String)::Vector{ou_part{Float32}}
+    io = open(fn, "r")
+    np = Vector{Int32}(undef, 1)
+    read!(io, np)
+    ps = Vector{ou_part{Float32}}(undef, np[1])
+    for i in 1:np[1]
+       p = ou_part(0, zeros(Float32, 3), zeros(Float32, 3), zeros(Float32, 3), zeros(Float32, 3), 0.0f0,0.0f0,0.0f0,0.0f0)
+        id = Vector{Int64}(undef, 1)
+        fl = Vector{Float32}(undef, 1)
+        read!(io, id)
+        p.id = id[1]
+        read!(io, p.pos)
+        read!(io, p.vel)
+        read!(io, p.fld)
+        read!(io, p.dW)
+        read!(io, fl)
+        p.tau=fl[1]
+        read!(io, fl)
+        p.sig=fl[1]
+        read!(io, fl)
+        p.taup=fl[1]
+        read!(io, fl)
+        p.d=fl[1]
+        ps[i] = p
+    end
+    close(io)
+    return ps
+end
+
 function write_ps(ps::Vector{part}, fn::String)
     io = open(fn, "w")
     write(io, Int32(lastindex(ps))) # write number of particles
@@ -528,3 +602,76 @@ function jh_part(fn1::String, fn2::String)
 end
 
 
+function get_parts(dir::String, step::Int64)
+    """
+    Returns vector of particles with id, position, particle velocity, and fldvel seen
+    """
+    suf = "."*"0"^(6-length(string(step)))*string(step)
+    np = get_npart(dir*"particle"*suf)
+    X  = read_pos(dir*"particle"*suf, np)
+    U  = read_arr(dir*"fld"*suf, np)
+    V  = read_arr(dir*"vel"*suf, np)
+    ids= read_vec(dir*"id"*suf, np)
+    Uf = read_arr(dir*"uf"*suf, np)
+    ps = Vector{part}(undef, np)
+    for i in 1:np
+        ps[i] = part(trunc(Int64, ids[i]), X[:,i], V[:,i], U[:,i], Uf[:,i])
+    end
+    perm = sortperm([p.id for p in ps])
+    return ps[perm]
+end
+
+function get_npart(fn::String)::Int32
+    """
+    Reads the ensight particle.****** files to get the number of particles
+    There's probably a more elegant way to do this but hey this works 
+    """
+    if split(split(fn, '.')[end-1], '/')[end] != "particle"
+        print(fn)
+        error("[get_npart] Not the correct file for reading npart")
+        return 
+    end
+    io = open(fn)
+    skip(io, 240)
+    n = Vector{Int32}(undef, 1)
+    read!(io, n); close(io)
+    return n[1]
+end
+
+function read_pos(fn::String, n::Int32)::Array{Float32}
+    """
+    Reads ensight particle geometry files
+    outputs (3, npart) array of position data
+    """
+    arr = Array{Float32}(undef, (3, n))
+    io = open(fn, "r")
+    skip(io, 244+4*n)
+    read!(io, arr)
+    close(io); return arr
+end
+
+function read_arr(fn::String, n::Int32)::Array{Float32}
+    """
+    Reads ensight particle data files and outputs a (3, npart) array of the vector data
+    The header size can vary (as far as I can tell) so read the particle.****** file first using get_npart()
+    to determine how much to skip in the data file
+    """
+    arr = Array{Float32}(undef, (3, n))
+    io = open(fn)
+    skip(io, 80)
+    read!(io, arr); close(io)
+    return arr
+end
+
+function read_vec(fn::String, n::Int32)::Vector{Float32}
+    """
+    Reads ensight particle data files and outputs a vector of particle scalar data
+    The header size can vary (as far as I can tell) so read the particle.****** file first using get_npart()
+    to determine how much to skip in the data file
+    """
+    vec = Vector{Float32}(undef, n)
+    io = open(fn)
+    skip(io, 80)
+    read!(io, vec); close(io)
+    return vec
+end

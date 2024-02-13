@@ -90,12 +90,14 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32)
     dr = rmax / nbins
     rv = 0:dr:rmax
     rdf = zeros(nbins)
-    V = L^3 
+    V = L^3
+    N = npart*(npart-1)/2
     ρ = N/V
     for i ∈ 1:npart
         for j ∈ i:npart
             if i != j
                r = norm(ps[i].pos - ps[j].pos)
+               r = get_minr(ps[i].pos, ps[j].pos, L)
                rind = floor(Int, r/dr) + 1
                check = rind < nbins
                if check
@@ -108,9 +110,6 @@ function get_rdf(ps::Vector{part}, nbins::Int64, L::Float32)
     for (i, bin) in enumerate(rdf)
         r = (rv[i] + rv[i+1])/2
         den = 4/3*π*(rv[i+1]^3 - rv[i]^3)
-        if dim == 2
-            den = π * (rv[i+1]^2 - rv[i]^2)
-        end
         rdf[i] = bin/(den*ρ)
     end
     return dr/2:dr:rmax-dr/2, rdf

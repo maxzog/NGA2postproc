@@ -52,9 +52,7 @@ mutable struct radialgrid<:grid
    U :: Array{Float32}
    V :: Array{Float32}
    W :: Array{Float32}
-   wX :: Array{Float32}
-   wY :: Array{Float32}
-   wZ :: Array{Float32}
+   wT :: Array{Float32}
    Urms :: Array{Float32}
    Vrms :: Array{Float32}
    Wrms :: Array{Float32}
@@ -149,4 +147,18 @@ function read_mesh(fn::String)
    ny = Int32(ncells[2]-1)
    nz = Int32(ncells[3]-1)
    return nx, ny, nz, xv, yv, zv 
+end
+
+function write_avg(avg::radialgrid, step::Int64; dir = "./avg_out/")
+   suf = string(step)*".txt"
+   writedlm(dir*"U_"*suf, avg.U)
+   writedlm(dir*"V_"*suf, avg.V)
+   writedlm(dir*"W_"*suf, avg.W)
+   writedlm(dir*"Urms_"*suf, avg.Urms)
+   writedlm(dir*"Vrms_"*suf, avg.Vrms)
+   writedlm(dir*"Wrms_"*suf, avg.Wrms)
+   writedlm(dir*"wT_"*suf, avg.wT)
+   writedlm(dir*"Lx_"*suf, avg.Lx)
+   writedlm(dir*"Ly_"*suf, avg.Ly)
+   return 
 end

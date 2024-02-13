@@ -1,5 +1,5 @@
 
-using Statistics, FFTW, DSP, Printf, LinearAlgebra, LaTeXStrings, StatsBase, DelimitedFiles, Glob
+using Statistics, FFTW, DSP, Printf, LinearAlgebra, LaTeXStrings, StatsBase, DelimitedFiles, Glob, SpecialFunctions
 
 const UMC = ["#00274c", "#4a5773", "#878c9c", "#c6c6c6", "#e0c795", "#f2c961", "#ffcb05"]
 

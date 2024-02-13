@@ -426,6 +426,37 @@ function sf_lt_cond_r(ps::Vector{part_dns}, nb::Int64, L::Float32)
     return dr, sfl, sft, s
 end
 
+function uu_lt_cond_r(ps::Vector{part}, nb::Int64, L::Float32)
+    re_id!(ps)
+    rmax = norm([L/2 L/2 L/2])
+    dr = rmax/nb
+    rv = 0:dr:rmax
+    uul = zeros(Float64, nb)
+    uut = zeros(Float64, nb)
+    c  = zeros(Int, nb); sc = 0; s = 0.
+
+    for i in 1:lastindex(ps), j in i:lastindex(ps)
+       p = ps[i]; q = ps[j]
+       # r = get_minr(p.pos, q.pos, L)
+       r = norm(q.pos-p.pos)
+       ir = floor(Int, r/dr) + 1
+       ir > lastindex(uul) ? check = false : check = true
+       if p.id != q.id && check
+           rl, rt = par_perp_u(p, q)
+           uul[ir] += dot(p.uf,rl)*dot(q.uf,rl)
+           uut[ir] += dot(p.uf,rt)*dot(q.uf,rt) 
+           c[ir]  += 1
+       end
+       if q.id == p.id
+           s += dot(p.uf, q.uf)
+           sc += 1
+       end
+    end
+    c = [c[i]==0 ? c[i]=1 : c[i]=c[i] for i in 1:lastindex(c)]
+    uul = uul./(3*c); uut = uut./(3*c); s = s/(3*sc)
+    return dr, uul, uut, s
+end
+
 function sf_lt_cond_r(ps::Vector{part}, nb::Int64, L::Float32)
     re_id!(ps)
     rmax = norm([L/2 L/2 L/2])

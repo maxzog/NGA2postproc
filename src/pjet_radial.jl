@@ -52,49 +52,109 @@ function get_radial_average(fn::String, step::Int64, nx::Int64, ny::Int64, nt::I
    return avg
 end
 
-function get_radial_avg(pjet::grid)    
-   avg = radialgrid(pjet.nx, pjet.ny, pjet.Lx, pjet.Ly, pjet.xv, pjet.yv, 
-                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), 
-                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), 
-                    Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)), Array{Float32}(undef, (pjet.nx, pjet.ny)))
-   tmp = zeros(Int64, (pjet.nx, pjet.ny))
-   for k in 1:pjet.nz
-      for j in 1:pjet.ny
-         for i in 1:pjet.nx 
-            r = norm([pjet.yv[j], pjet.zv[k]])
-            jj = floor(Int64, r / pjet.dym) + 1
-            @assert(typeof(jj) == Int64)
-            if sign(pjet.yv[j]) == -1
-               jj = trunc(Int, pjet.ny/2) - jj
-            elseif jj == 1
-               jj = trunc(Int, pjet.ny/2)
-            elseif sign(pjet.yv[j]) == 1
-               jj = trunc(Int, pjet.ny/2) + jj
-            end 
-            if jj > 0 && jj < pjet.ny
-               avg.U[i,jj] += pjet.U[i,j,k]
-               avg.V[i,jj] += pjet.V[i,j,k]
-               avg.W[i,jj] += pjet.W[i,j,k]
-               avg.wX[i,jj] += pjet.wX[i,j,k]
-               avg.wY[i,jj] += pjet.wY[i,j,k]
-               avg.wZ[i,jj] += pjet.wZ[i,j,k]
-               tmp[i,jj] += 1
-            end
-         end
+function get_lims(pjet::grid)
+   ks = 1; ke = pjet.nz
+   js = 1; je = pjet.ny
+   is = 1; ie = pjet.nx
+   
+   isReplaced = false
+   for i in 1:pjet.nx
+      if pjet.xvm[i] > 0.0254f0*10.0f0 && !isReplaced
+         ie = i
+         isReplaced = true
       end
    end
-   for j in 1:pjet.ny
-      for i in 1:pjet.nx
+   
+   isReplaced = false
+   isReplaced2 = false
+   for i in 1:pjet.ny
+      if pjet.yvm[i] > -0.0254f0*2.5f0 && !isReplaced
+         js = i
+         isReplaced = true
+      end
+      if pjet.yvm[i] > 0.0254f0*2.5f0 && !isReplaced2
+         je = i
+         isReplaced2 = true
+      end
+   end
+
+   isReplaced = false
+   isReplaced2 = false
+   for i in 1:pjet.nz
+      if pjet.zvm[i] > -0.0254f0*2.5f0 && !isReplaced
+         ks = i
+         isReplaced = true
+      end
+      if pjet.zvm[i] > 0.0254f0*2.5f0 && !isReplaced2
+         ke = i
+         isReplaced2 = true
+      end
+   end
+
+   return [[is,ie], [js,je], [ks,ke]]
+end
+
+function get_radial_average(pjet::grid; nx_avg = 128, ny_avg = 64)
+   avg = radialgrid(nx_avg, ny_avg, 10f0*0.0254f0, 2.5f0*0.0254f0, pjet.xvm, pjet.yvm, 
+                    zeros(Float32, (nx_avg, ny_avg)), zeros(Float32, (nx_avg, ny_avg)), zeros(Float32, (nx_avg, ny_avg)), 
+                    zeros(Float32, (nx_avg, ny_avg)), zeros(Float32, (nx_avg, ny_avg)), zeros(Float32, (nx_avg, ny_avg)), 
+                    zeros(Float32, (nx_avg, ny_avg)))
+   dr = maximum(pjet.yvm) / ny_avg
+   dx = avg.Lx / avg.nx
+   tmp = zeros(Int64, (nx_avg, ny_avg))
+   lims = get_lims(pjet)
+   is,ie = lims[1]
+   js,je = lims[2]
+   ks,ke = lims[3]
+   for k in ks:ke
+      for j in js:je
+         for i in is:ie 
+            r = [0.0f0, pjet.yvm[j], pjet.zvm[k]]
+            rn = norm(r)
+            rhat = r / rn
+            rind = floor(Int64, rn / dr) + 1
+            if !isapprox(norm(rhat), 1.0f0)
+               rind = 1
+            end
+            rtheta = cross(rhat, [0.0f0,1.0f0,0.0f0])
+            rtheta = cross(rtheta, rhat) / norm(cross(rtheta, rhat))
+            omega = [pjet.wX[i,j,k], pjet.wY[i,j,k], pjet.wZ[i,j,k]]
+            if !isapprox(norm(rtheta), 1.0f0)
+               rtheta = omega / norm(omega)
+            end
+
+            i_avg = floor(Int64, pjet.xvm[i] / dx) + 1
+
+            if rind < ny_avg && rind > 0 && i_avg < nx_avg
+               avg.U[i_avg,rind] += pjet.U[i,j,k]
+               avg.V[i_avg,rind] += pjet.V[i,j,k]
+               avg.W[i_avg,rind] += pjet.W[i,j,k]
+               avg.Urms[i_avg,rind] += pjet.U[i,j,k]^2
+               avg.Vrms[i_avg,rind] += pjet.V[i,j,k]^2
+               avg.Wrms[i_avg,rind] += pjet.W[i,j,k]^2
+               avg.wT[i_avg,rind] += dot(omega, rtheta)
+               tmp[i_avg,rind] += 1
+            end
+         end
+         
+      end
+   end
+   for j in 1:ny_avg
+      for i in 1:nx_avg
          if tmp[i,j] != 0
             avg.U[i,j]  /= tmp[i,j]
             avg.V[i,j]  /= tmp[i,j]
             avg.W[i,j]  /= tmp[i,j]
-            avg.wX[i,j] /= tmp[i,j]
-            avg.wY[i,j] /= tmp[i,j]
-            avg.wZ[i,j] /= tmp[i,j]
+            avg.Urms[i,j]  /= tmp[i,j]
+            avg.Vrms[i,j]  /= tmp[i,j]
+            avg.Wrms[i,j]  /= tmp[i,j]
+            avg.wT[i,j] /= tmp[i,j]
          end
       end 
    end
+   avg.Urms = avg.Urms - avg.U.^2
+   avg.Vrms = avg.Vrms - avg.V.^2
+   avg.Wrms = avg.Wrms - avg.W.^2
    return avg
 end
 
