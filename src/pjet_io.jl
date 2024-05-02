@@ -110,6 +110,27 @@ function get_pipe(fn::String, step::Int64)
                    U, V, W)
 end
 
+function get_grid(fn::String, step::Int64) 
+   """
+   Reads NGA2 ensight files and returns a grid type containing the stored data fields
+   """
+   
+   step = string(step)
+   nx, ny, nz, xv, yv, zv = read_mesh(fn)
+   Lx = xv[end]-xv[1]
+   Ly = yv[end]-yv[1]
+   Lz = zv[end]-zv[1]
+   
+   dxm = xv[2] - xv[1]
+   dym = yv[2] - yv[1]
+   dzm = zv[2] - zv[1]
+
+   fnv = fn*"/velocity/velocity." * "0"^(6-length(step)) * step
+   U, V, W = read_vel(fnv, nx, ny, nz)
+
+   return dnsgrid(nx, Lx, dxm, U, V, W, zeros(Float32, (nx, ny, nz)))
+end
+
 function read_mesh(fn::String)
    ## Read the mesh
    io = open(fn*"/geometry", "r")

@@ -377,7 +377,7 @@ function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}
    n = floor(Int64, xiv[1] / field.Δ) + 1
    p = floor(Int64, xiv[2] / field.Δ) + 1
    q = floor(Int64, xiv[3] / field.Δ) + 1
-   xv = LinRange(0.0f0, field.L-field.Δ,field.n)
+   xv = LinRange(field.Δ/2, field.L - field.Δ/2, field.n)
    rvec = zeros(Float32, 3)
    for i in 1:4, j in 1:4, k in 1:4
       ii = n-2+i
@@ -387,16 +387,85 @@ function Lag4Interp(field::grid, xiv::Vector{Float32})::Vector{Float32}
       ii > field.n ? ii -= field.n : nothing
       jj > field.n ? jj -= field.n : nothing
       kk > field.n ? kk -= field.n : nothing
-
       ii < 1 ? ii += field.n : nothing
       jj < 1 ? jj += field.n : nothing
       kk < 1 ? kk += field.n : nothing
+
       lx = get_Lag4poly(xv, n, xiv[1], ii)
       ly = get_Lag4poly(xv, p, xiv[2], jj)
       lz = get_Lag4poly(xv, q, xiv[3], kk)
+
       rvec[1] += field.U[ii, jj, kk] * lx * ly * lz
       rvec[2] += field.V[ii, jj, kk] * lx * ly * lz
       rvec[3] += field.W[ii, jj, kk] * lx * ly * lz
+   end
+   return rvec
+end
+
+function Lag4InterpFiltered(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+  # for i in eachindex(xiv)
+  #    if xiv[i] > field.L
+  #       xiv[i] = xiv[i] - field.L
+  #    end
+  # end
+   n = floor(Int64, xiv[1] / field.Δ) + 1
+   p = floor(Int64, xiv[2] / field.Δ) + 1
+   q = floor(Int64, xiv[3] / field.Δ) + 1
+   xv = LinRange(field.Δ/2, field.L - field.Δ/2, field.n)
+   rvec = zeros(Float32, 3)
+   for i in 1:4, j in 1:4, k in 1:4
+      ii = n-2+i
+      jj = p-2+j
+      kk = q-2+k
+      
+      ii > field.n ? ii -= field.n : nothing
+      jj > field.n ? jj -= field.n : nothing
+      kk > field.n ? kk -= field.n : nothing
+      ii < 1 ? ii += field.n : nothing
+      jj < 1 ? jj += field.n : nothing
+      kk < 1 ? kk += field.n : nothing
+
+      lx = get_Lag4poly(xv, n, xiv[1], ii)
+      ly = get_Lag4poly(xv, p, xiv[2], jj)
+      lz = get_Lag4poly(xv, q, xiv[3], kk)
+
+      rvec[1] += field.Uf[ii, jj, kk] * lx * ly * lz
+      rvec[2] += field.Vf[ii, jj, kk] * lx * ly * lz
+      rvec[3] += field.Wf[ii, jj, kk] * lx * ly * lz
+   end
+   return rvec
+end
+
+function Lag4InterpSubFilter(field::grid, xiv::Vector{Float32})::Vector{Float32}   
+  # for i in eachindex(xiv)
+  #    if xiv[i] > field.L
+  #       xiv[i] = xiv[i] - field.L
+  #    end
+  # end
+   n = floor(Int64, xiv[1] / field.Δ) + 1
+   p = floor(Int64, xiv[2] / field.Δ) + 1
+   q = floor(Int64, xiv[3] / field.Δ) + 1
+   xv = LinRange(field.Δ/2, field.L - field.Δ/2, field.n)
+   rvec = zeros(Float32, 3)
+   for i in 1:4, j in 1:4, k in 1:4
+      ii = n-2+i
+      jj = p-2+j
+      kk = q-2+k
+      
+      ii > field.n ? ii -= field.n : nothing
+      jj > field.n ? jj -= field.n : nothing
+      kk > field.n ? kk -= field.n : nothing
+      ii < 1 ? ii += field.n : nothing
+      jj < 1 ? jj += field.n : nothing
+      kk < 1 ? kk += field.n : nothing
+
+      lx = get_Lag4poly(xv, n, xiv[1], ii)
+      ly = get_Lag4poly(xv, p, xiv[2], jj)
+      lz = get_Lag4poly(xv, q, xiv[3], kk)
+
+      rvec[1] += (field.U[ii, jj, kk] - field.Uf[ii, jj, kk]) * lx * ly * lz
+      rvec[2] += (field.V[ii, jj, kk] - field.Vf[ii, jj, kk]) * lx * ly * lz
+      rvec[3] += (field.W[ii, jj, kk] - field.Wf[ii, jj, kk]) * lx * ly * lz
    end
    return rvec
 end

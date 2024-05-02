@@ -11,17 +11,40 @@ function ispectral!(hit::lesgrid)
     return 
 end
 
+function fftfreq(n::Int, d::Float32)
+   val = Float32(1.0/(n*d))
+   results = zeros(Float32, n)
+   for i = 0:n-1
+      results[i+1] = if i <= n /2
+                        i
+                     else
+                        i - n
+                     end * val
+   end
+   return results
+end
+
+function ndgrid(vx::Vector{Int64}, vy::Vector{Int64}, vz::Vector{Int64})
+   kx = repeat(vx, 1, length(vy), length(vz))
+   ky = repeat(reshape(vy, 1, :, 1), length(vx), 1, length(vz))
+   kz = repeat(reshape(vz, 1, 1, :), length(vx), length(vy), 1)
+   return kx, ky, kz
+end
+
+function ndgrid(vx::Vector{Float32}, vy::Vector{Float32}, vz::Vector{Float32})
+   kx = repeat(vx, 1, length(vy), length(vz))
+   ky = repeat(reshape(vy, 1, :, 1), length(vx), 1, length(vz))
+   kz = repeat(reshape(vz, 1, 1, :), length(vx), length(vy), 1)
+   return kx, ky, kz
+end
+
 function tophat_spec!(hit::lesgrid, kv::Vector{Int64})
-    for i∈1:hit.n, j∈1:hit.n, k∈1:hit.n
-        kk = norm([kv[i] kv[j] kv[k]])
-        if kk > 1e-6
-            G = sin(0.5*kk*hit.Δf)/(0.5*kk*hit.Δf)
-            hit.Uk[i,j,k] *= G 
-            hit.Vk[i,j,k] *= G 
-            hit.Wk[i,j,k] *= G 
-        end
-    end
-    return 
+   kv = fftfreq(hit.n, hit.Δ)
+   kx, ky, kz = ndgrid(kv, kv, kv)
+   transfer_function = sinc.(kx*hit.Δf) .* sinc.(ky*hit.Δf) .* sinc.(kz*hit.Δf)
+   hit.Uk = transfer_function .* hit.Uk
+   hit.Vk = transfer_function .* hit.Vk
+   hit.Wk = transfer_function .* hit.Wk
 end
 
 function sharpspec!(hit::lesgrid, kv::Vector{Int64})

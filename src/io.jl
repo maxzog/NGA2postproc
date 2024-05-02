@@ -287,14 +287,14 @@ function get_parts_pjet(dir::String, step::Int64)
     return ps[perm]
 end
 
-function init_parts(n::Int64, pt::String)::Vector{part_dns}
+function init_parts(n::Int64, particle_type::String)
    """
    init particle vector for n particles
        pos, vel, fld all equal to zero
    """
-   if lowercase(pt) == "crw"
+   if lowercase(particle_type) == "crw"
       ps = [part(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
-   elseif lowercase(pt) == "dns"
+   elseif lowercase(particle_type) == "dns"
       ps = [part_dns(i, Float32.(zeros(3)), Float32.(zeros(3)), Float32.(zeros(3))) for i in 1:n]
    end
    return ps
@@ -331,6 +331,20 @@ function read_P(fn::String, nx::Int32, ny::Int32, nz::Int32)::Array{Float32}
     return arr
 end
 
+function write_vec(fn::String, vec::Vector{Float32})
+    """
+    Reads ensight particle data files and outputs a vector of particle scalar data
+    The header size can vary (as far as I can tell) so read the particle.****** file first using get_npart()
+    to determine how much to skip in the data file
+    """
+    n = Float32(lastindex(vec))
+    io = open(fn, "w")
+    header = zeros(UInt8, 80) # Blank header
+    write(io, header)
+    write(io, vec)
+    close(io)
+end
+
 function read_vec(fn::String, n::Int32)::Vector{Float32}
     """
     Reads ensight particle data files and outputs a vector of particle scalar data
@@ -355,6 +369,45 @@ function read_arr(fn::String, n::Int32)::Array{Float32}
     skip(io, 80)
     read!(io, arr); close(io)
     return arr
+end
+
+function write_arr(fn::String, arr::Array{Float32})
+   """
+   Writes binary ensight(ish) particle data to file
+   Meant for use with P3 (Parallel Post Proc) code
+   INPUTS:
+      fn  - Filename
+      arr - Array of particle vector data (3, n)
+   OUTPUTS:
+      none - writes to file
+   """
+   n = Int32(size(arr, 2)) # Number of particles
+   io = open(fn, "w")
+   header = zeros(UInt8, 80) # Blank header
+   write(io, header)
+   write(io, arr)
+   close(io)
+end
+
+function write_pos(fn::String, arr::Array{Float32})
+   """
+   Writes binary ensight(ish) particle data to file
+   Meant for use with P3 (Parallel Post Proc) code
+   INPUTS:
+      fn  - Filename
+      arr - Array of particle position data (3, n)
+   OUTPUTS:
+      none - writes to file
+   """
+   n = Int32(size(arr, 2)) # Number of particles
+   io = open(fn, "w")
+   header = zeros(UInt8, 240)
+   write(io, header)          # Skip
+   write(io, n)               # Write number of particles to file
+   header = zeros(UInt8, 4*n) 
+   write(io, header)          # Skip
+   write(io, arr)             # Write position data
+   close(io)
 end
 
 function read_pos(fn::String, n::Int32)::Array{Float32}
@@ -674,4 +727,23 @@ function read_vec(fn::String, n::Int32)::Vector{Float32}
     skip(io, 80)
     read!(io, vec); close(io)
     return vec
+end
+
+function WriteCRWEnsight(dir::String, ps::Vector{part{Float32}}; suf="000001")
+   fnp = dir*"/particle."*suf
+   fnv = dir*"/vel."*suf
+   fnf = dir*"/fld."*suf
+   fnu = dir*"/uf."*suf
+   fni = dir*"/id."*suf
+   
+   arr = mapreduce(permutedims, hcat, [p.pos for p in ps]')
+   write_pos(fnp, arr)
+   arr = mapreduce(permutedims, hcat, [p.vel for p in ps]')
+   write_arr(fnv, arr)
+   arr = mapreduce(permutedims, hcat, [p.fld for p in ps]')
+   write_arr(fnf, arr)
+   arr = mapreduce(permutedims, hcat, [p.uf for p in ps]')
+   write_arr(fnu, arr)
+   arr = [Float32(p.id) for p in ps]
+   write_vec(fni, arr)
 end
